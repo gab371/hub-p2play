@@ -23,13 +23,17 @@ export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, ext
         setLoading(true);
         setError(null);
 
+        // Compute base-relative path for deployment on subpaths (e.g. GitHub Pages)
+        const rawBase = import.meta.env.BASE_URL || './';
+        const gameBasePath = rawBase.endsWith('/') ? `${rawBase}games/${gameName}/` : `${rawBase}/games/${gameName}/`;
+
         // Inject game CSS
         const styleId = `game-style-${gameName}`;
         if (!document.getElementById(styleId)) {
           styleLink = document.createElement('link');
           styleLink.id = styleId;
           styleLink.rel = 'stylesheet';
-          styleLink.href = `/games/${gameName}/style.css`;
+          styleLink.href = `${gameBasePath}style.css`;
           document.head.appendChild(styleLink);
         }
 
@@ -42,7 +46,7 @@ export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, ext
           script = document.createElement('script');
           script.id = `game-script-${gameName}`;
           script.type = 'module';
-          script.src = `/games/${gameName}/index.js`;
+          script.src = `${gameBasePath}index.js`;
           script.onload = () => resolve();
           script.onerror = () => reject(new Error(`Échec du chargement du script du jeu "${gameName}"`));
           document.head.appendChild(script);
