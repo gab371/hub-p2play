@@ -1,0 +1,80 @@
+name: Deploy Hub to GitHub Pages & Create Release
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages and creating Releases
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download & Extract Production Games
+        run: node download-games.js
+
+      - name: Build Hub
+        run: npm run build
+
+      - name: Zip Hub Production Assets
+        run: |
+          cd dist
+          zip -r ../hub.zip .
+        shell: bash
+
+      - name: Set Release Tag
+        id: set_tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=v$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Create or Update GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "hub.zip"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ env.TAG_NAME }}
+          allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
