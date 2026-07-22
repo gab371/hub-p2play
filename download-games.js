@@ -76,8 +76,12 @@ async function prepareGames() {
       }
       fs.mkdirSync(tempExtractDir, { recursive: true });
 
-      // Extract ZIP using PowerShell on Windows
-      execSync(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${tempExtractDir}' -Force"`);
+      // Extract ZIP using PowerShell on Windows or unzip on Linux/macOS
+      if (process.platform === 'win32') {
+        execSync(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${tempExtractDir}' -Force"`);
+      } else {
+        execSync(`unzip -o "${tempZipPath}" -d "${tempExtractDir}"`);
+      }
 
       // Copy compiled content. We search if 'dist' folder is nested in zip
       let sourceDir = tempExtractDir;
