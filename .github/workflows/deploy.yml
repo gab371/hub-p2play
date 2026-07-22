@@ -69,9 +69,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Download & Extract Production Games
-        run: node download-games.js
-
       - name: Build Hub
         run: npm run build
 

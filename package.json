@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node download-games.js && vite",
     "prebuild": "node download-games.js",
-    "build": "npm run prebuild && tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test:e2e": "playwright test",
