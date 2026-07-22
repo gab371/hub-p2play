@@ -1,0 +1,18 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Editor & OS
+.DS_Store
+*.local
+
+# Downloaded game bundles (generated dynamically by pre-build script download-games.js)
+public/games/
