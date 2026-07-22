@@ -16,3 +16,10 @@ dist-ssr/
 
 # Downloaded game bundles (generated dynamically by pre-build script download-games.js)
 public/games/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/shots/
+/explore-games.cjs

@@ -17,7 +17,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  smoke-test:
+    name: Playwright smoke tests (launch + 1 round per game)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download & Extract Production Games
+        run: node download-games.js
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
   deploy:
+    needs: smoke-test
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -12,6 +12,12 @@ export class HubPeerManager {
   public onMessage: ((sender: string, data: any) => void) | null = null;
   public onPlayersUpdate: (() => void) | null = null;
 
+  // Game-level callbacks (used by embedded games via externalPeerManager)
+  public onStateReceived: ((state: any) => void) | null = null;
+  public onChatReceived: ((msg: any) => void) | null = null;
+  public onAudioReceived: ((sfx: string) => void) | null = null;
+  public hostActionHandler: ((sender: string, msg: any) => void) | null = null;
+
   public username: string = "";
   public avatar: string = "👑";
   public lobbyPlayers: { peerId: string; username: string; avatar: string }[] = [];
@@ -98,8 +104,26 @@ export class HubPeerManager {
       if (this.onMessage) {
         this.onMessage(conn.peer, data);
       }
-      
-      // If we are host, broadcast non-join messages to other clients
+
+      // Game-level message routing (embedded games reuse this peer manager)
+      switch (data.type) {
+        case 'STATE_UPDATE':
+          if (this.onStateReceived && data.state) this.onStateReceived(data.state);
+          return;
+        case 'CHAT':
+          if (this.onChatReceived) this.onChatReceived(data);
+          if (this.isHost) this.broadcast(data, conn.peer); // relay to other merchants
+          return;
+        case 'AUDIO_EVENT':
+          if (this.onAudioReceived && data.sfx) this.onAudioReceived(data.sfx);
+          if (this.isHost) this.broadcast(data, conn.peer); // relay to other merchants
+          return;
+        case 'ACTION':
+          if (this.isHost && this.hostActionHandler) this.hostActionHandler(conn.peer, data);
+          return; // host engine processes; do not relay raw actions
+      }
+
+      // If we are host, broadcast non-join hub messages to other clients
       if (this.isHost && data.type !== 'PLAYER_JOINED' && data.type !== 'UPDATE_AVATAR') {
         this.broadcast(data, conn.peer);
       }
@@ -126,6 +150,50 @@ export class HubPeerManager {
   public send(peerId: string, data: any) {
     const conn = this.connections.get(peerId);
     if (conn) conn.send(data);
+  }
+
+  // ---- Game PeerManager API (used by embedded games via externalPeerManager) ----
+
+  public sendToHost(type: string, payload: any): void {
+    if (this.isHost) {
+      if (this.hostActionHandler && this.myPeerId) {
+        this.hostActionHandler(this.myPeerId, { type, ...payload });
+      }
+    } else if (this.hostPeerId) {
+      const conn = this.connections.get(this.hostPeerId);
+      if (conn && conn.open) conn.send({ type, ...payload });
+    }
+  }
+
+  public broadcastState(state: any): void {
+    if (this.isHost) this.broadcast({ type: 'STATE_UPDATE', state });
+  }
+
+  public sendChat(senderName: string, text: string): void {
+    const chatMsg = {
+      type: 'CHAT',
+      sender: senderName,
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    if (this.isHost) {
+      this.broadcast(chatMsg);
+      if (this.onChatReceived) this.onChatReceived(chatMsg);
+    } else if (this.hostPeerId) {
+      const conn = this.connections.get(this.hostPeerId);
+      if (conn && conn.open) conn.send(chatMsg);
+    }
+  }
+
+  public sendAudio(sfx: string): void {
+    const audioMsg = { type: 'AUDIO_EVENT', sfx };
+    if (this.isHost) {
+      this.broadcast(audioMsg);
+      if (this.onAudioReceived) this.onAudioReceived(sfx);
+    } else if (this.hostPeerId) {
+      const conn = this.connections.get(this.hostPeerId);
+      if (conn && conn.open) conn.send(audioMsg);
+    }
   }
 
   public updateAvatar(newAvatar: string) {
