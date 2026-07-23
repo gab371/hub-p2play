@@ -4,6 +4,7 @@ import { Lobby } from "./components/game/Lobby";
 import { GameMountPanel } from "./components/game/GameMountPanel";
 import { AvatarSelector } from "./components/game/AvatarSelector";
 import { Gamepad2 } from "lucide-react";
+import { SoundToggle } from "./components/ui/SoundToggle";
 
 export default function App() {
   const hub = useHub();
@@ -45,28 +46,31 @@ export default function App() {
           </div>
         </div>
 
-        {hub.roomId && (
-          <div className="flex items-center gap-3 text-xs">
-            <span className="bg-emerald-950/80 border border-emerald-800 text-emerald-400 px-3 py-1.5 rounded-full font-bold">
-              Salon Connecté
-            </span>
-            <span className="text-zinc-400 font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-850">
-              Code : <span className="text-violet-400 font-bold">{hub.roomId}</span>
-            </span>
-            <button
-              onClick={handleCopy}
-              className="px-2.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 text-zinc-300 font-bold rounded-xl border border-zinc-750 transition-all"
-            >
-              {copied ? "Copié !" : "Copier"}
-            </button>
-            <button
-              onClick={hub.disconnect}
-              className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/20 text-rose-400 border border-rose-900/30 rounded-xl font-bold transition-all"
-            >
-              Quitter
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <SoundToggle className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800" />
+          {hub.roomId && (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="bg-emerald-950/80 border border-emerald-800 text-emerald-400 px-3 py-1.5 rounded-full font-bold">
+                Salon Connecté
+              </span>
+              <span className="text-zinc-400 font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-850">
+                Code : <span className="text-violet-400 font-bold">{hub.roomId}</span>
+              </span>
+              <button
+                onClick={handleCopy}
+                className="px-2.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 text-zinc-300 font-bold rounded-xl border border-zinc-750 transition-all"
+              >
+                {copied ? "Copié !" : "Copier"}
+              </button>
+              <button
+                onClick={hub.disconnect}
+                className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/20 text-rose-400 border border-rose-900/30 rounded-xl font-bold transition-all"
+              >
+                Quitter
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Main content */}

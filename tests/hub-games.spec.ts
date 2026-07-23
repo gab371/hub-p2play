@@ -10,8 +10,9 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
  *
  * The embedded auto-start only fires for the host once the hub lobby has 2
  * players, so each test brings up a second browser context (guest) that joins
- * the host's room via PeerJS. The guest is only needed to populate the lobby;
- * it is asserted on only for Sheriff (deck-theme propagation).
+ * the host's room via PeerJS. The guest is only needed to populate the lobby
+ * for Skull; for Royal and Sheriff the guest is also asserted on (deck-theme
+ * propagation, and "Je suis Prêt !" for Royal's ready-gated start).
  */
 
 const HUB = "http://localhost:3004";
@@ -95,9 +96,13 @@ async function returnToHub(host: Page) {
 }
 
 // --- Auto-start games (board appears right after the hub launch) ----------------
+//
+// Only Skull still auto-starts in embedded mode. Royal and Sheriff now show a
+// pre-game lobby (deck selection) that the host must configure before starting
+// — see the dedicated parameterized sections below.
 
 type AutoStartGame = {
-  key: "skull" | "royal";
+  key: "skull";
   cardText: string;
   lobbyMarker: RegExp;
   boardMarker: RegExp;
@@ -120,19 +125,6 @@ const AUTO_START_GAMES: AutoStartGame[] = [
         .toBeLessThan(before);
     },
   },
-  {
-    key: "royal",
-    cardText: "Royal",
-    lobbyMarker: /Salon Royal/,
-    boardMarker: /PUPITRE DES DÉCISIONS/,
-    playRound: async (host) => {
-      await expect(host.getByText(/À votre tour de régner/)).toBeVisible();
-      const revenu = host.locator("button", { hasText: "Revenu (+1)" }).first();
-      await expect(revenu).toBeEnabled();
-      await revenu.click();
-      await expect(host.getByText(/À votre tour de régner/)).toBeHidden({ timeout: 15000 });
-    },
-  },
 ];
 
 for (const g of AUTO_START_GAMES) {
@@ -149,6 +141,72 @@ for (const g of AUTO_START_GAMES) {
     } finally {
       await test.info().attach(
         `${g.key}-console-errors.txt`,
+        { body: errors.join("\n") || "(no console/page errors)" },
+      );
+      await hostCtx.close();
+      await guestCtx.close();
+    }
+  });
+}
+
+// --- Royal: host must pick a deck, guest must ready, then host starts ----------------
+//
+// The updated Royal Bluff no longer auto-starts in embedded mode: it shows the
+// "Salon Royal" lobby so the host can choose the deck (Coup Classique /
+// Coup : Réformation) before starting. The host's "Lancer la partie" is gated
+// on all players being ready, so the guest must click "Je suis Prêt !" first.
+// We exercise both decks to verify the selection propagates to the guest and
+// the game still launches a round.
+
+const ROYAL_DECKS = [
+  { key: "CLASSIC", label: "Coup Classique", active: /Actif : Coup Classique/ },
+  { key: "REFORMATION", label: "Coup : Réformation", active: /Actif : Coup : Réformation/ },
+];
+
+for (const deck of ROYAL_DECKS) {
+  test(`launch royal with ${deck.key} deck and play one round`, async ({ browser }) => {
+    const errors: string[] = [];
+    const { host, guest, hostCtx, guestCtx } = await createTwoPlayerRoom(browser, errors);
+    try {
+      await launchFromHub(host, "Royal");
+
+      // The royal lobby (with the deck selector) must appear.
+      await expect(host.getByText(/Salon Royal/)).toBeVisible({ timeout: 40000 });
+
+      // Host picks the deck.
+      const deckBtn = host.locator("button", { hasText: deck.label }).first();
+      await expect(deckBtn).toBeEnabled();
+      await deckBtn.click();
+
+      // The deck choice must propagate to the guest (read-only "Actif : …").
+      await expect(guest.getByText(deck.active)).toBeVisible({ timeout: 15000 });
+
+      // Guest must ready up before the host can start.
+      const readyBtn = guest.getByRole("button", { name: /Je suis Prêt/i }).first();
+      await expect(readyBtn).toBeEnabled();
+      await readyBtn.click();
+
+      // Host starts the game from the royal lobby (enabled once guest is ready).
+      const inGameLaunch = host.getByRole("button", { name: /Lancer la partie/i }).first();
+      await expect(inGameLaunch).toBeEnabled({ timeout: 15000 });
+      await inGameLaunch.click();
+
+      // The board must appear (round 1 started).
+      await waitForBoard(host, /PUPITRE DES DÉCISIONS/, "royal-" + deck.key);
+      expect(/Conspirateurs connectés/.test((await host.locator("body").innerText()) ?? ""),
+        "royal: salon lobby should be gone").toBe(false);
+
+      // Round in progress: the host is the active monarch.
+      await expect(host.getByText(/À votre tour de régner/)).toBeVisible({ timeout: 15000 });
+      const revenu = host.locator("button", { hasText: "Revenu (+1)" }).first();
+      await expect(revenu).toBeEnabled();
+      await revenu.click();
+      await expect(host.getByText(/À votre tour de régner/)).toBeHidden({ timeout: 15000 });
+
+      await returnToHub(host);
+    } finally {
+      await test.info().attach(
+        `royal-${deck.key}-console-errors.txt`,
         { body: errors.join("\n") || "(no console/page errors)" },
       );
       await hostCtx.close();
