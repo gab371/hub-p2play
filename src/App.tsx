@@ -24,7 +24,8 @@ export default function App() {
   const AVAILABLE_GAMES = [
     { key: "skull", name: "💀 Skull & Roses", desc: "Mises, Bluff & Roses." },
     { key: "royal", name: "👑 Royal Bluff (Coup)", desc: "Influence & Rôles cachés." },
-    { key: "sheriff", name: "🤠 Sheriff & Smugglers", desc: "Négociation & Pots-de-vin." }
+    { key: "sheriff", name: "🤠 Sheriff & Smugglers", desc: "Négociation & Pots-de-vin." },
+    { key: "pool", name: "🎱 8 Ball Pool", desc: "Billard par équipes + spectateurs." }
   ];
 
   return (
@@ -139,7 +140,7 @@ export default function App() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {AVAILABLE_GAMES.map((g) => (
                   <button
                     key={g.key}

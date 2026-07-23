@@ -11,6 +11,10 @@
     "sheriff": {
       "repo": "gab371/sheriff-smugglers",
       "version": "v1.0.1"
+    },
+    "pool": {
+      "repo": "gab371/eight-ball-pool",
+      "version": "v0.1.0"
     }
   }
 }
