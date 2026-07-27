@@ -1,0 +1,14 @@
+name = "p2play-github-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Optional: attach a neutral hostname (no *.workers.dev personal subdomain).
+# Domain must be on the same Cloudflare account. Then set Action secret:
+#   VITE_GITHUB_PROXY_URL=https://gh-proxy.yourdomain.com/api/github-proxy
+#
+# [[routes]]
+# pattern = "gh-proxy.yourdomain.com"
+# custom_domain = true
+
+# Optional: wrangler secret put GITHUB_TOKEN
+# [vars]

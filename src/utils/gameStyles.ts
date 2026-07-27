@@ -68,6 +68,12 @@ function waitForStylesheet(link: HTMLLinkElement): Promise<HTMLLinkElement> {
     };
     const onError = () => {
       cleanup();
+      // Blob / optional CSS should not block game JS mount.
+      if (link.href.startsWith("blob:")) {
+        console.warn(`[gameStyles] Optional stylesheet failed (${link.href}), continuing.`);
+        resolve(link);
+        return;
+      }
       reject(new Error(`Failed to load stylesheet: ${link.href}`));
     };
     const cleanup = () => {

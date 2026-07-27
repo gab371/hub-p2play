@@ -4,9 +4,18 @@ import {
   activateGameStyle,
   unloadAllGameStyles,
 } from "../../utils/gameStyles";
+import {
+  isCustomGameKey,
+  loadOrFetchCustomGame,
+  loadStoredCustomGames,
+  resolveCustomMountFnName,
+  type CustomGameMeta,
+} from "../../utils/customGameLoader";
 
 const FALLBACK_SHELL_BACKGROUND =
   "radial-gradient(circle at center, #09090b 0%, #09090b 100%)";
+const CUSTOM_SHELL_BACKGROUND =
+  "radial-gradient(circle at center, #180e29 0%, #09090b 100%)";
 
 interface GameMountPanelProps {
   gameName: string;
@@ -26,12 +35,37 @@ interface GameMountPanelProps {
   onLeave?: () => void;
 }
 
-export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, externalPeerManager, isHost, lateJoin, gameConfig, hubPhase, mountFnName, shellBackground, onExit, onLeave }: GameMountPanelProps) {
+function resolveCustomMeta(gameName: string): CustomGameMeta | undefined {
+  return loadStoredCustomGames().find((g) => g.key === gameName);
+}
+
+export function GameMountPanel({
+  gameName,
+  peerId,
+  playerName,
+  playerAvatar,
+  externalPeerManager,
+  isHost,
+  lateJoin,
+  gameConfig,
+  hubPhase,
+  mountFnName,
+  shellBackground,
+  onExit,
+  onLeave,
+}: GameMountPanelProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const resolvedShellBackground = shellBackground ?? FALLBACK_SHELL_BACKGROUND;
+  const customMeta = resolveCustomMeta(gameName);
+  const isCustom = Boolean(customMeta) || isCustomGameKey(gameName);
+
+  const resolvedShellBackground =
+    shellBackground ??
+    customMeta?.shellBackground ??
+    (isCustom ? CUSTOM_SHELL_BACKGROUND : FALLBACK_SHELL_BACKGROUND);
+
   useEffect(() => {
     let script: HTMLScriptElement | null = null;
     let unmountGame: (() => void) | null = null;
@@ -42,15 +76,35 @@ export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, ext
         setLoading(true);
         setError(null);
 
-        const rawBase = import.meta.env.BASE_URL || "./";
-        const gameBasePath = rawBase.endsWith("/")
-          ? `${rawBase}games/${gameName}/`
-          : `${rawBase}/games/${gameName}/`;
+        let scriptSrc = "";
+        let resolvedMount = mountFnName;
 
-        // Load only this game's CSS (fonts + utilities). Background is painted
-        // on the shell below — body{background} cannot fill the viewport when
-        // the only child is position:fixed (body height collapses → white flash).
-        await activateGameStyle(gameName, `${gameBasePath}style.css`);
+        if (isCustom) {
+          const meta = customMeta;
+          if (!meta) {
+            throw new Error(
+              `Métadonnées du jeu custom "${gameName}" introuvables. Ré-ajoutez le dépôt depuis le Hub.`,
+            );
+          }
+          const { jsBlobUrl, cssBlobUrl } = await loadOrFetchCustomGame(meta);
+          if (cancelled) return;
+          scriptSrc = jsBlobUrl;
+          resolvedMount = resolveCustomMountFnName(meta);
+          if (cssBlobUrl) {
+            await activateGameStyle(gameName, cssBlobUrl);
+          }
+        } else {
+          const rawBase = import.meta.env.BASE_URL || "./";
+          const gameBasePath = rawBase.endsWith("/")
+            ? `${rawBase}games/${gameName}/`
+            : `${rawBase}/games/${gameName}/`;
+
+          await activateGameStyle(gameName, `${gameBasePath}style.css`);
+          if (cancelled) return;
+          scriptSrc = `${gameBasePath}index.js`;
+          resolvedMount = mountFnName ?? defaultHubMountFnName(gameName);
+        }
+
         if (cancelled) return;
 
         await new Promise<void>((resolve, reject) => {
@@ -60,24 +114,24 @@ export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, ext
           script = document.createElement("script");
           script.id = `game-script-${gameName}`;
           script.type = "module";
-          script.src = `${gameBasePath}index.js`;
+          script.src = scriptSrc;
           script.onload = () => resolve();
-          script.onerror = () => reject(new Error(`Échec du chargement du script du jeu "${gameName}"`));
+          script.onerror = () =>
+            reject(new Error(`Échec du chargement du script du jeu "${gameName}"`));
           document.head.appendChild(script);
         });
 
         if (cancelled) return;
 
-        const resolvedMountFnName = mountFnName ?? defaultHubMountFnName(gameName);
-        const mountFn = (window as any)[resolvedMountFnName];
+        const mountFn = (window as unknown as Record<string, unknown>)[resolvedMount!];
 
         if (typeof mountFn !== "function") {
-          throw new Error(`Fonction de montage "${resolvedMountFnName}" introuvable sur window.`);
+          throw new Error(`Fonction de montage "${resolvedMount}" introuvable sur window.`);
         }
 
         if (mountRef.current) {
           mountRef.current.innerHTML = "";
-          const cleanup = mountFn(mountRef.current, {
+          const cleanup = (mountFn as (el: HTMLElement, props: unknown) => unknown)(mountRef.current, {
             peerId,
             playerName,
             playerAvatar,
@@ -90,20 +144,21 @@ export function GameMountPanel({ gameName, peerId, playerName, playerAvatar, ext
             onExit,
           });
           if (typeof cleanup === "function") {
-            unmountGame = cleanup;
+            unmountGame = cleanup as () => void;
           }
         }
 
         setLoading(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (cancelled) return;
         console.error("Failed to load game module:", err);
-        setError(`Impossible de charger le jeu "${gameName}" : ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`Impossible de charger le jeu "${gameName}" : ${message}`);
         setLoading(false);
       }
     };
 
-    loadGame();
+    void loadGame();
 
     return () => {
       cancelled = true;

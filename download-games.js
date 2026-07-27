@@ -111,8 +111,12 @@ function pruneOrphanGameDirs() {
 }
 
 function writeCatalog(manifests) {
-  fs.writeFileSync(catalogPath, JSON.stringify({ games: manifests }, null, 2) + '\n', 'utf8');
-  console.log(`Wrote catalog with ${manifests.length} game(s) → ${catalogPath}`);
+  const enriched = manifests.map((m) => {
+    const cfg = gamesConfig.games[m.key];
+    return cfg?.repo ? { ...m, repo: cfg.repo } : m;
+  });
+  fs.writeFileSync(catalogPath, JSON.stringify({ games: enriched }, null, 2) + '\n', 'utf8');
+  console.log(`Wrote catalog with ${enriched.length} game(s) → ${catalogPath}`);
 }
 
 /** Refresh manifests + catalog.json without re-downloading release zips (monorepo / local). */

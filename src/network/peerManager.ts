@@ -20,6 +20,7 @@ export class HubPeerManager implements PeerManagerLike {
   public activeGame: string | null = null;
   public gameConfig: any = null;
   public phase: HubPhase = 'HUB_LOBBY';
+  public customGames: HubState['customGames'] = [];
 
   // Game-level callbacks (used by embedded games via externalPeerManager)
   public onStateReceived: ((state: any) => void) | null = null;
@@ -230,6 +231,7 @@ export class HubPeerManager implements PeerManagerLike {
       gameConfig: this.gameConfig,
       phase: this.phase,
       enableVoice: this.enableVoice,
+      customGames: this.customGames,
     };
   }
 
@@ -242,7 +244,15 @@ export class HubPeerManager implements PeerManagerLike {
     if (state.enableVoice !== undefined) {
       this.enableVoice = state.enableVoice;
     }
+    if (Array.isArray(state.customGames)) {
+      this.customGames = state.customGames;
+    }
     if (this.onHubStateUpdate) this.onHubStateUpdate(this.getHubState());
+  }
+
+  public setHubCustomGames(games: NonNullable<HubState['customGames']>) {
+    this.customGames = games;
+    if (this.isHost) this.broadcastHubState();
   }
 
   public broadcastHubState(excludePeerId?: string) {

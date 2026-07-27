@@ -72,7 +72,73 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Optional Live-games proxy: deploy Cloudflare Worker, then bake its URL into the Hub build.
+      # Secrets: CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID
+      # Variable (Settings → Variables, not Secrets): VITE_ENABLE_LIVE_GAMES=false to force off
+      # Optional secret override for custom domain: VITE_GITHUB_PROXY_URL
+      - name: Detect Cloudflare credentials
+        id: cf
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LIVE_FLAG: ${{ vars.VITE_ENABLE_LIVE_GAMES }}
+        run: |
+          if [ "$LIVE_FLAG" = "false" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "VITE_ENABLE_LIVE_GAMES=false — skipping Cloudflare proxy deploy."
+          elif [ -n "$CF_TOKEN" ] && [ -n "$CF_ACCOUNT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID — Live GitHub games stay off (or use secret VITE_GITHUB_PROXY_URL)."
+          fi
+
+      - name: Deploy GitHub proxy Worker
+        if: steps.cf.outputs.enabled == 'true'
+        id: cf_proxy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/github-proxy
+          command: deploy
+
+      - name: Resolve Live games proxy URL
+        id: live_proxy
+        env:
+          CF_DEPLOY_URL: ${{ steps.cf_proxy.outputs.deployment-url }}
+          MANUAL_PROXY_URL: ${{ secrets.VITE_GITHUB_PROXY_URL }}
+          LIVE_FLAG: ${{ vars.VITE_ENABLE_LIVE_GAMES }}
+        run: |
+          url=""
+          if [ "$LIVE_FLAG" = "false" ]; then
+            echo "url=" >> "$GITHUB_OUTPUT"
+            echo "Live GitHub games forced off via vars.VITE_ENABLE_LIVE_GAMES=false."
+            exit 0
+          fi
+          if [ -n "$MANUAL_PROXY_URL" ]; then
+            url="${MANUAL_PROXY_URL%/}"
+          elif [ -n "$CF_DEPLOY_URL" ]; then
+            host=$(echo "$CF_DEPLOY_URL" | awk '{print $1}')
+            case "$host" in
+              https://*) url="$host" ;;
+              http://*) url="$host" ;;
+              *) url="https://$host" ;;
+            esac
+            url="${url%/}/api/github-proxy"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          if [ -n "$url" ]; then
+            echo "Live GitHub proxy configured for this build."
+          else
+            echo "No proxy URL — Live GitHub games disabled in this build."
+          fi
+
       - name: Build Hub
+        env:
+          VITE_GITHUB_PROXY_URL: ${{ steps.live_proxy.outputs.url }}
+          # Repository variable (Actions → Variables), e.g. false — NOT available as secrets.*
+          VITE_ENABLE_LIVE_GAMES: ${{ vars.VITE_ENABLE_LIVE_GAMES }}
         run: npm run build
 
       - name: Zip Hub Production Assets

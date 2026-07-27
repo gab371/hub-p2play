@@ -1,20 +1,70 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { formatHubGameLabel } from "p2play-core";
 import { useHub } from "./hooks/useHub";
 import { useGamesCatalog } from "./hooks/useGamesCatalog";
 import { Lobby } from "./components/game/Lobby";
 import { GameMountPanel } from "./components/game/GameMountPanel";
+import { AddGameModal } from "./components/game/AddGameModal";
+import { GameSelectionPanel } from "./components/game/GameSelectionPanel";
 import { AvatarSelector } from "./components/game/AvatarSelector";
 import { Gamepad2 } from "lucide-react";
 import { SoundToggle } from "./components/ui/SoundToggle";
 import { VoiceChatPanel } from "p2play-core/voice";
 import { TextChatPanel } from "p2play-core/chat";
 import { copyRoomUrlToClipboard } from "p2play-core/url";
+import { resolveCustomMountFnName } from "./utils/customGameLoader";
+import { isLiveGamesEnabled } from "./utils/liveGamesFlag";
 
 export default function App() {
   const hub = useHub();
-  const { games: availableGames, loading: catalogLoading, error: catalogError } = useGamesCatalog();
+  const { games: catalogGames, loading: catalogLoading, error: catalogError } = useGamesCatalog();
   const [copied, setCopied] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const enableHubVoice = import.meta.env.VITE_ENABLE_VOICE_CHAT !== "false";
+  const enableLiveGames = isLiveGamesEnabled();
+
+  const quickExamples = useMemo(
+    () =>
+      catalogGames.flatMap((g) => (g.repo ? [{ label: g.label, slug: g.repo }] : [])),
+    [catalogGames],
+  );
+
+  const allGames = useMemo(() => {
+    const builtin = catalogGames.map((g) => ({
+      key: g.key,
+      label: g.label,
+      desc: g.desc,
+      hasPreConfig: g.hasPreConfig,
+      mountFn: g.mountFn,
+      shellBackground: g.shellBackground,
+      avatars: g.avatars,
+      isCustom: false as const,
+    }));
+
+    if (!enableLiveGames) return builtin;
+
+    const custom = hub.customGames.map((cg) => ({
+      key: cg.key,
+      label: formatHubGameLabel({
+        key: cg.key,
+        name: cg.name,
+        emoji: cg.emoji,
+        desc: cg.desc || `Partie GitHub (${cg.repo})`,
+        hasPreConfig: cg.hasPreConfig,
+      }),
+      desc: cg.desc || `Partie GitHub (${cg.repo})`,
+      hasPreConfig: cg.hasPreConfig,
+      mountFn: resolveCustomMountFnName(cg),
+      shellBackground: cg.shellBackground,
+      avatars: cg.avatars,
+      isCustom: true as const,
+    }));
+
+    return [...builtin, ...custom];
+  }, [catalogGames, hub.customGames, enableLiveGames]);
+
+  const selectedGameObj = allGames.find((g) => g.key === hub.selectedGame);
+  const activeGameObj = allGames.find((g) => g.key === hub.activeGame);
 
   const handleCopy = () => {
     if (hub.roomId) {
@@ -42,8 +92,8 @@ export default function App() {
           lateJoin={!hub.isHost}
           gameConfig={hub.gameConfig}
           hubPhase={hub.hubPhase}
-          mountFnName={availableGames.find((g) => g.key === hub.activeGame)?.mountFn}
-          shellBackground={availableGames.find((g) => g.key === hub.activeGame)?.shellBackground}
+          mountFnName={activeGameObj?.mountFn}
+          shellBackground={activeGameObj?.shellBackground}
           onExit={hub.returnToHub}
           onLeave={hub.disconnect}
         />
@@ -125,63 +175,27 @@ export default function App() {
                 </div>
 
                 <div className="p-6 bg-zinc-900/40 border border-zinc-850 rounded-3xl shadow-xl">
-                    <AvatarSelector
-                    selectedAvatar={hub.players.find(p => p.peerId === hub.myPeerId)?.avatar || "👑"}
+                  <AvatarSelector
+                    selectedAvatar={hub.players.find((p) => p.peerId === hub.myPeerId)?.avatar || "👑"}
                     onSelectAvatar={hub.updateAvatar}
-                    gameAvatars={availableGames.find((g) => g.key === hub.selectedGame)?.avatars}
+                    gameAvatars={selectedGameObj?.avatars}
                   />
                 </div>
 
-                <div className="p-6 bg-zinc-900/40 border border-zinc-850 rounded-3xl shadow-xl space-y-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-xl font-bold text-zinc-200">🎮 Sélectionner un jeu</h2>
-                      <p className="text-xs text-zinc-400">
-                        {hub.isHost ? "Choisissez le jeu de votre partie" : "En attente du choix de l'hôte..."}
-                      </p>
-                    </div>
-                    {hub.isHost && hub.selectedGame && (
-                      <button
-                        onClick={() => {
-                          const game = availableGames.find((g) => g.key === hub.selectedGame);
-                          hub.launchGame(game?.hasPreConfig ? 'GAME_CONFIG' : 'GAME_RUNNING');
-                        }}
-                        className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 font-bold rounded-xl text-white transition-all shadow-lg shadow-violet-900/30"
-                      >
-                        Lancer la partie
-                      </button>
-                    )}
-                  </div>
-
-                  {catalogError && (
-                    <p className="text-sm text-rose-400 bg-rose-950/30 border border-rose-900/40 rounded-xl px-3 py-2">
-                      {catalogError}
-                    </p>
-                  )}
-
-                  {catalogLoading ? (
-                    <p className="text-sm text-zinc-500">Chargement du catalogue de jeux…</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {availableGames.map((g) => (
-                        <button
-                          key={g.key}
-                          onClick={() => hub.isHost && hub.broadcastGameSelection(g.key)}
-                          disabled={!hub.isHost}
-                          className={`p-5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-4 h-36 ${hub.selectedGame === g.key
-                              ? "bg-violet-950/20 border-violet-500 ring-2 ring-violet-500"
-                              : "bg-zinc-950/50 border-zinc-850 hover:bg-zinc-900/30"
-                            } ${!hub.isHost ? "cursor-not-allowed" : ""}`}
-                        >
-                          <div>
-                            <h3 className="font-bold text-zinc-200">{g.label}</h3>
-                            <p className="text-xs text-zinc-400 mt-1">{g.desc}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <GameSelectionPanel
+                  games={allGames}
+                  selectedGame={hub.selectedGame}
+                  isHost={hub.isHost}
+                  catalogLoading={catalogLoading}
+                  catalogError={catalogError}
+                  enableLiveGames={enableLiveGames}
+                  onSelect={hub.broadcastGameSelection}
+                  onLaunch={() =>
+                    hub.launchGame(selectedGameObj?.hasPreConfig ? "GAME_CONFIG" : "GAME_RUNNING")
+                  }
+                  onAddClick={enableLiveGames ? () => setIsAddModalOpen(true) : undefined}
+                  onRemoveCustom={hub.removeCustomGame}
+                />
 
                 <TextChatPanel
                   messages={hub.chatMessages}
@@ -208,6 +222,15 @@ export default function App() {
             </a>
           </footer>
         </div>
+      )}
+
+      {enableLiveGames && (
+        <AddGameModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onGameAdded={(meta) => hub.addCustomGameMeta(meta)}
+          examples={quickExamples}
+        />
       )}
 
       {enableHubVoice && hub.enableVoice && hub.roomId && (

@@ -6,9 +6,11 @@ import {
   syncRoomUrlToAddressBar,
 } from "p2play-core/url";
 import { globalHubPeer } from "../network/peerManager";
+import type { GameActionMessage, HubState } from "../network/protocol";
+import { useCustomGames } from "./useCustomGames";
 
 export function useHub() {
-  const [status, setStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
+  const [status, setStatus] = useState<"CONNECTING" | "CONNECTED" | "DISCONNECTED">("DISCONNECTED");
   const [roomId, setRoomId] = useState<string | null>(null);
   const [players, setPlayers] = useState<{ peerId: string; username: string; avatar: string }[]>([]);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
@@ -17,6 +19,14 @@ export function useHub() {
   const [isHost, setIsHost] = useState(false);
   const [enableVoice, setEnableVoice] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => globalHubPeer.chatHistory);
+
+  const {
+    customGames,
+    addCustomGameMeta,
+    removeCustomGame: removeCustomGameBase,
+    syncCustomGamesFromHub,
+    seedHostCustomGames,
+  } = useCustomGames();
 
   useEffect(() => {
     // Hub owns the salon chat store. usePeer chains over this handler while a game is mounted
@@ -30,7 +40,7 @@ export function useHub() {
   }, []);
 
   const sendChat = useCallback((text: string) => {
-    const localPlayer = globalHubPeer.lobbyPlayers.find(p => p.peerId === globalHubPeer.myPeerId);
+    const localPlayer = globalHubPeer.lobbyPlayers.find((p) => p.peerId === globalHubPeer.myPeerId);
     const sender = localPlayer?.username || globalHubPeer.username || "Joueur";
     globalHubPeer.sendChat(sender, text);
   }, []);
@@ -39,25 +49,45 @@ export function useHub() {
     globalHubPeer.updateAvatar(avatar);
   }, []);
 
+  const removeCustomGame = useCallback(
+    (key: string) => {
+      removeCustomGameBase(key);
+      setSelectedGame((prev) => (prev === key ? null : prev));
+      setActiveGame((prev) => (prev === key ? null : prev));
+    },
+    [removeCustomGameBase],
+  );
+
   const broadcastGameSelection = useCallback((gameKey: string) => {
     setSelectedGame(gameKey);
     if (globalHubPeer.isHost) {
       globalHubPeer.setHubSelection(gameKey);
     } else {
-      globalHubPeer.broadcast({ type: 'SELECT_GAME', payload: gameKey, sender: globalHubPeer.myPeerId || "" });
+      globalHubPeer.broadcast({
+        type: "SELECT_GAME",
+        payload: gameKey,
+        sender: globalHubPeer.myPeerId || "",
+      });
     }
   }, []);
 
-  const launchGame = useCallback((phase: 'GAME_CONFIG' | 'GAME_RUNNING' = 'GAME_RUNNING') => {
-    const game = globalHubPeer.selectedGame || selectedGame;
-    if (!game) return;
-    setActiveGame(game);
-    if (globalHubPeer.isHost) {
-      globalHubPeer.setHubActiveGame(game, phase);
-    } else {
-      globalHubPeer.broadcast({ type: 'START_GAME', payload: game, sender: globalHubPeer.myPeerId || "" });
-    }
-  }, [selectedGame]);
+  const launchGame = useCallback(
+    (phase: "GAME_CONFIG" | "GAME_RUNNING" = "GAME_RUNNING") => {
+      const game = globalHubPeer.selectedGame || selectedGame;
+      if (!game) return;
+      setActiveGame(game);
+      if (globalHubPeer.isHost) {
+        globalHubPeer.setHubActiveGame(game, phase);
+      } else {
+        globalHubPeer.broadcast({
+          type: "START_GAME",
+          payload: game,
+          sender: globalHubPeer.myPeerId || "",
+        });
+      }
+    },
+    [selectedGame],
+  );
 
   const returnToHub = useCallback(() => {
     setActiveGame(null);
@@ -66,7 +96,7 @@ export function useHub() {
     if (globalHubPeer.isHost) {
       globalHubPeer.resetHubState();
     } else {
-      globalHubPeer.broadcast({ type: 'RETURN_TO_HUB', sender: globalHubPeer.myPeerId || "" });
+      globalHubPeer.broadcast({ type: "RETURN_TO_HUB", sender: globalHubPeer.myPeerId || "" });
     }
   }, []);
 
@@ -85,7 +115,7 @@ export function useHub() {
   useEffect(() => {
     globalHubPeer.onStatusChange = (newStatus) => {
       setStatus(newStatus);
-      if (newStatus === 'CONNECTED') {
+      if (newStatus === "CONNECTED") {
         const id = globalHubPeer.hostPeerId;
         setRoomId(id);
         if (id) syncRoomUrlToAddressBar(id);
@@ -103,24 +133,23 @@ export function useHub() {
       setPlayers([...globalHubPeer.lobbyPlayers]);
     };
 
-    globalHubPeer.onHubStateUpdate = (state) => {
+    globalHubPeer.onHubStateUpdate = (state: HubState) => {
       setSelectedGame(state.selectedGame);
       setActiveGame(state.activeGame);
       setGameConfig(state.gameConfig);
-      if (state.enableVoice !== undefined) {
-        setEnableVoice(state.enableVoice);
-      }
+      if (state.enableVoice !== undefined) setEnableVoice(state.enableVoice);
+      if (Array.isArray(state.customGames)) syncCustomGamesFromHub(state.customGames);
     };
 
-    globalHubPeer.onMessage = (_sender, data) => {
+    globalHubPeer.onMessage = (_sender, data: GameActionMessage) => {
       switch (data.type) {
-        case 'SELECT_GAME':
+        case "SELECT_GAME":
           setSelectedGame(data.payload);
           break;
-        case 'START_GAME':
+        case "START_GAME":
           setActiveGame(data.payload);
           break;
-        case 'RETURN_TO_HUB':
+        case "RETURN_TO_HUB":
           setActiveGame(null);
           setSelectedGame(null);
           setGameConfig(null);
@@ -134,13 +163,17 @@ export function useHub() {
       globalHubPeer.onHubStateUpdate = null;
       globalHubPeer.onMessage = null;
     };
-  }, [status, roomId]);
+  }, [status, roomId, syncCustomGamesFromHub]);
 
-  const createRoom = useCallback((roomName: string, username: string, avatar: string = "👑", voiceEnabled: boolean = true) => {
-    setIsHost(true);
-    setEnableVoice(voiceEnabled);
-    globalHubPeer.initialize(true, roomName, username, avatar, voiceEnabled);
-  }, []);
+  const createRoom = useCallback(
+    (roomName: string, username: string, avatar: string = "👑", voiceEnabled: boolean = true) => {
+      setIsHost(true);
+      setEnableVoice(voiceEnabled);
+      seedHostCustomGames();
+      globalHubPeer.initialize(true, roomName, username, avatar, voiceEnabled);
+    },
+    [seedHostCustomGames],
+  );
 
   const joinRoom = useCallback((roomName: string, username: string, avatar: string = "👑") => {
     setIsHost(false);
@@ -165,6 +198,7 @@ export function useHub() {
     selectedGame,
     activeGame,
     gameConfig,
+    customGames,
     phase: globalHubPeer.phase,
     hubPhase: globalHubPeer.phase,
     isHost,
@@ -174,11 +208,13 @@ export function useHub() {
     createRoom,
     joinRoom,
     updateAvatar,
+    addCustomGameMeta,
+    removeCustomGame,
     broadcastGameSelection,
     launchGame,
     updateGameConfig,
     returnToHub,
     disconnect,
-    externalPeerManager: globalHubPeer
+    externalPeerManager: globalHubPeer,
   };
 }

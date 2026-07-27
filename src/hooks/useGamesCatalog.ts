@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import type { HubGameManifest } from "p2play-core";
 import { formatHubGameLabel } from "p2play-core";
 
-export type HubCatalogGame = HubGameManifest & { label: string };
+export type HubCatalogGame = HubGameManifest & {
+  label: string;
+  /** From games.json via download-games.js — used for live-add quick examples. */
+  repo?: string;
+};
 
 interface GamesCatalogFile {
-  games: HubGameManifest[];
+  games: Array<HubGameManifest & { repo?: string }>;
 }
 
 function catalogUrl(): string {
@@ -41,6 +45,7 @@ export function useGamesCatalog() {
         const mapped = data.games.map((g) => ({
           ...g,
           label: formatHubGameLabel(g),
+          repo: typeof g.repo === "string" ? g.repo : undefined,
         }));
         if (!cancelled) setGames(mapped);
       } catch (err) {
