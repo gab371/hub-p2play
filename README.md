@@ -10,6 +10,7 @@ All WebRTC network transport, voice chat, and room management rely on the unifie
 
 - **Single Page Application (SPA) Orchestration**: The entire lifecycle (Hub <-> Games) occurs on a single HTML/React page without iFrames.
 - **Persistent Party Group P2P**: WebRTC connection (via PeerJS and `p2play-core`) is established at Hub level and passed seamlessly to the selected game on launch (`externalPeerManager`).
+- **Heartbeat & presence (in-game)**: `p2play-core` detects silent disconnects; games use `p2play-core/presence` for 60s grace + F5 reconnect while a match is running (Hub salon auto-rejoin is not required for games to work).
 - **Full-Screen Rendering & Navigation**: Games render full-screen (`100vw` × `100vh`) with a top navigation bar containing a **`← P2Play Lobby`** button to return to the party room at any time.
 - **Direct Game Lobby Bypass**: Players enter username and avatar once in the Hub. Launching transitions directly to the game board or pre-game deck selection lobby.
 - **Dual Pack Emote Selector**: Support for universal Hub emotes and game-specific thematic emotes.
@@ -19,7 +20,7 @@ All WebRTC network transport, voice chat, and room management rely on the unifie
 
 ## 🛠️ Tech Stack
 
-- **Unified Network Engine**: [`p2play-core`](https://github.com/gab371/p2play-core) (PeerJS WebRTC transport, session handover, voice chat & spectator mode).
+- **Unified Network Engine**: [`p2play-core`](https://github.com/gab371/p2play-core) (PeerJS WebRTC transport, session handover, heartbeat, voice, spectator, **presence / reconnect**).
 - **UI Framework**: React 18 / 19, TypeScript, Tailwind CSS, Lucide React.
 - **Build Tool**: Vite (ES Modules support & dynamic script injection).
 - **Automation**: Node.js (`download-games.js`) for downloading GitHub releases.
@@ -49,10 +50,10 @@ Open your browser at `http://localhost:3004`.
 
 ## 📚 Technical Documentation
 
-- 🌐 **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**: Complete P2P network engine, voice chat, and spectator guide.
-- 🏛️ **[Hub Architecture](docs/architecture.md)**: Persistent P2P Party Group, WebRTC handover, and SPA lifecycle.
+- 🌐 **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**: P2P engine, voice, spectator, session & presence guides.
+- 🏛️ **[Hub Architecture](docs/architecture.md)**: Persistent P2P Party Group, WebRTC handover, SPA lifecycle, and in-game reconnect boundary.
 - 🔌 **[Mount Contract (`window.mountXxx`)](docs/game-mount-contract.md)**: Specification for game ES Module bundles.
-- 🛠️ **[Developer Guide: Add a New Game](docs/developer-guide-new-game.md)**: Step-by-step tutorial to adapt games with `p2play-core`, configure Vite, and publish compatible GitHub Releases.
+- 🛠️ **[Developer Guide: Add a New Game](docs/developer-guide-new-game.md)**: Step-by-step tutorial (`p2play-core` ≥ v0.5.0, presence, Vite, releases).
 
 ---
 

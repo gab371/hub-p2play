@@ -135,4 +135,12 @@ export default defineConfig(({ mode }) => {
 - **Selector Scoping**: Wrap game-specific CSS themes inside unique container classes (e.g. `.theme-skull`) to prevent style leaks into Hub UI.
 - **Asset Paths**: All media assets (images, audio, SVGs) should be imported via Vite modules or referenced using relative paths (`./assets/`) to work correctly when served under `public/games/${gameKey}/`.
 
+---
+
+## 6. Presence / Reconnect (in-game)
+
+While the Hub owns the WebRTC session (`externalPeerManager`), **disconnect grace and F5 reconnect during a match** are implemented inside each game via `p2play-core/presence` (`attachPresenceHandlers` on the host `useGame` effect). The mount contract itself does not change — pass the same `externalPeerManager` and let the game register presence handlers on that instance.
+
+See [Presence & Reconnect Guide](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md) and [Developer Guide §6](./developer-guide-new-game.md).
+
 For detailed P2P networking guidelines, read **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**.

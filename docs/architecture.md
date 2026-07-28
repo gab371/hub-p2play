@@ -68,8 +68,20 @@ When a sub-game is mounted:
 - Hub's active network instance is passed via `externalPeerManager` option.
 - Sub-game's `usePeer` hook from `p2play-core` reuses this instance without re-instantiating PeerJS.
 - Sub-game registers action handlers (`hostActionHandler`) and state callbacks (`onStateReceived`).
+- Prefer **`attachPresenceHandlers`** from `p2play-core/presence` for host-side disconnect grace and `REQUEST_RECONNECT` (do not duplicate grace timers in each game).
 
-For full details on network API, voice chat, and spectator features, read the **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**.
+### Heartbeat
+
+Hub's peer manager and standalone `PeerManager` run **PING/PONG** heartbeats so silent WebRTC drops surface as `onPeerStatusChange(..., 'DISCONNECTED')`. Games react via presence (lobby remove vs in-game grace).
+
+### Reconnect boundary (Hub vs game)
+
+| Surface | Behavior (v0.5.0) |
+|---------|-------------------|
+| **In-game** (embedded or standalone) | Guest F5 / brief drop → session + `REQUEST_RECONNECT` + engine `remapPlayerId` within grace window |
+| **Hub party room** | Auto-rejoin of the Hub salon after F5 is **not** required for game presence to work; host F5 still kills the room (no host migration) |
+
+For full details on network API, voice, spectator, session, and presence, read the **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)** — especially [Presence & Reconnect](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md).
 
 ---
 

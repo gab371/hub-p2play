@@ -3,12 +3,18 @@ import type { DataConnection } from "peerjs";
 import type { ChatMessage, NetworkMessage, PeerManagerLike } from "p2play-core";
 import type { HubPhase, HubState } from "./protocol";
 
+const HEARTBEAT_MS = 5_000;
+const HEARTBEAT_TIMEOUT_MS = 12_000;
+
 export class HubPeerManager implements PeerManagerLike {
   private peer: Peer | null = null;
   public myPeerId: string | null = null;
   public hostPeerId: string | null = null;
   public connections: Map<string, DataConnection> = new Map();
   public isHost: boolean = false;
+
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPongReceived: Map<string, number> = new Map();
 
   public onStatusChange: ((status: 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED') => void) | null = null;
   public onMessage: ((sender: string, data: any) => void) | null = null;
@@ -81,6 +87,8 @@ export class HubPeerManager implements PeerManagerLike {
         const conn = this.peer!.connect(roomId);
         this.setupConnection(conn);
       }
+
+      this.startHeartbeat();
     });
 
     this.peer.on("connection", (conn) => {
@@ -104,6 +112,7 @@ export class HubPeerManager implements PeerManagerLike {
   private setupConnection(conn: DataConnection) {
     conn.on("open", () => {
       this.connections.set(conn.peer, conn);
+      this.lastPongReceived.set(conn.peer, Date.now());
       this.onPeerStatusChange?.(conn.peer, 'CONNECTED');
       
       // If we are a client connecting to host, let the host know our username & avatar
@@ -113,6 +122,14 @@ export class HubPeerManager implements PeerManagerLike {
     });
 
     conn.on("data", (data: any) => {
+      if (data.type === 'PING') {
+        if (conn.open) conn.send({ type: 'PONG', ts: Date.now() });
+        return;
+      }
+      if (data.type === 'PONG') {
+        this.lastPongReceived.set(conn.peer, Date.now());
+        return;
+      }
       if (data.type === 'PLAYER_JOINED' && this.isHost) {
         // Add new player to lobby mapping
         const playerObj = typeof data.payload === 'string' 
@@ -200,6 +217,18 @@ export class HubPeerManager implements PeerManagerLike {
 
     conn.on("close", () => {
       this.connections.delete(conn.peer);
+      this.lastPongReceived.delete(conn.peer);
+      this.onPeerStatusChange?.(conn.peer, 'DISCONNECTED');
+      if (this.isHost) {
+        this.lobbyPlayers = this.lobbyPlayers.filter(p => p.peerId !== conn.peer);
+        this.broadcast({ type: 'SYNC_LOBBY', payload: this.lobbyPlayers });
+      }
+      if (this.onPlayersUpdate) this.onPlayersUpdate();
+    });
+
+    conn.on("error", () => {
+      this.connections.delete(conn.peer);
+      this.lastPongReceived.delete(conn.peer);
       this.onPeerStatusChange?.(conn.peer, 'DISCONNECTED');
       if (this.isHost) {
         this.lobbyPlayers = this.lobbyPlayers.filter(p => p.peerId !== conn.peer);
@@ -351,7 +380,47 @@ export class HubPeerManager implements PeerManagerLike {
     if (this.onPlayersUpdate) this.onPlayersUpdate();
   }
 
+  public startHeartbeat(): void {
+    this.stopHeartbeat();
+    const now = Date.now();
+    this.connections.forEach((_conn, peerId) => this.lastPongReceived.set(peerId, now));
+
+    this.heartbeatInterval = setInterval(() => {
+      const ping = { type: 'PING', ts: Date.now() };
+      const deadline = Date.now() - HEARTBEAT_TIMEOUT_MS;
+
+      this.connections.forEach((conn) => {
+        if (conn.open) conn.send(ping);
+      });
+
+      for (const [peerId, lastSeen] of this.lastPongReceived) {
+        if (lastSeen < deadline && this.connections.has(peerId)) {
+          console.warn(`[hub-p2play] heartbeat timeout for ${peerId}`);
+          const conn = this.connections.get(peerId);
+          this.connections.delete(peerId);
+          this.lastPongReceived.delete(peerId);
+          this.onPeerStatusChange?.(peerId, 'DISCONNECTED');
+          if (this.isHost) {
+            this.lobbyPlayers = this.lobbyPlayers.filter(p => p.peerId !== peerId);
+            this.broadcast({ type: 'SYNC_LOBBY', payload: this.lobbyPlayers });
+          }
+          if (this.onPlayersUpdate) this.onPlayersUpdate();
+          try { conn?.close(); } catch { /* already dead */ }
+        }
+      }
+    }, HEARTBEAT_MS);
+  }
+
+  public stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    this.lastPongReceived.clear();
+  }
+
   public disconnect() {
+    this.stopHeartbeat();
     this.connections.forEach(conn => conn.close());
     this.connections.clear();
     if (this.peer) {

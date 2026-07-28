@@ -6,12 +6,13 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 
 ## 📋 Integration Checklist
 
-- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.3.3`).
+- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.5.0`).
 - [ ] **Step 2**: Configure dual build modes (`standalone` & `lib`) in `vite.config.ts`.
 - [ ] **Step 3**: Expose `window.mountXxx` in `src/main.tsx`.
 - [ ] **Step 4**: Use `usePeer` from `p2play-core` to manage P2P connections (standalone and `externalPeerManager`).
 - [ ] **Step 5**: Use shared `<P2PlayLobby />` for the standalone home screen (themed + `classes`); keep connected-room lobby game-specific.
 - [ ] **Step 6**: Adapt `useGame.ts` / `App.tsx` to auto-populate players and bypass local home screen when `isEmbedded` is active.
+- [ ] **Step 6b**: Wire **`p2play-core/presence`** (`attachPresenceHandlers` + engine `remapPlayerId`) for disconnect grace / F5 reconnect.
 - [ ] **Step 7**: Configure CI/CD GitHub Actions workflow (`deploy.yml`) to build `dist.zip` and `standalone.zip`.
 - [ ] **Step 8**: Ship `public/hub-manifest.json` and pin download in Hub's `games.json`.
 
@@ -24,7 +25,7 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 Add `p2play-core` to your game's `package.json`:
 
 ```bash
-npm install github:gab371/p2play-core#v0.3.3
+npm install github:gab371/p2play-core#v0.5.0
 ```
 
 ---
@@ -177,9 +178,15 @@ Full theming / invitation docs: [`p2play-core` Lobby Guide](https://github.com/g
 
 ### Step 6: Direct Bypass & Embedded Pre-Game Configuration (`useGame.ts`)
 
-In `src/hooks/useGame.ts`, add embedded checks to populate players automatically from `peerManager.lobbyPlayers` while staying in `LOBBY` phase if your game features pre-game deck/rule configuration:
+In `src/hooks/useGame.ts`, add embedded checks to populate players automatically from `peerManager.lobbyPlayers` while staying in `LOBBY` phase if your game features pre-game deck/rule configuration. Also wire **presence** on the host effect:
 
 ```typescript
+import {
+  attachPresenceHandlers,
+  createSeatEngine,
+  handleJoinGameSeat,
+} from "p2play-core/presence";
+
   useEffect(() => {
     if (!isHost) return;
 
@@ -208,8 +215,30 @@ In `src/hooks/useGame.ts`, add embedded checks to populate players automatically
       // Host triggers start via "Launch Game" button in pre-game lobby.
       broadcastSanitizedStates(engine.state);
     }
+
+    // Presence: grace + REQUEST_RECONNECT + JOIN seat (required for F5 mid-game)
+    const presence = attachPresenceHandlers({
+      peerManager,
+      getEngine: () =>
+        createSeatEngine({
+          getPhase: () => engine.state.phase,
+          getPlayers: () => engine.state.players,
+          getSpectators: () => engine.state.spectators,
+          markDisconnected: (id) => engine.markDisconnected(id),
+          isDisconnected: (id) => engine.isDisconnected(id),
+          remapPlayerId: (o, n, p) => engine.remapPlayerId(o, n, p),
+          removePlayer: (id) => engine.removePlayer(id),
+        }),
+      onBroadcast: () => broadcastSanitizedStates(engine.state),
+      onHostAction: (_sender, msg) => {
+        /* ACTION switch — JOIN_GAME via handleJoinGameSeat */
+      },
+    });
+    return () => presence.dispose();
   }, [options?.isEmbedded, isHost]);
 ```
+
+Engine must implement `markDisconnected` / `isDisconnected` / `remapPlayerId` / `removePlayer`. Full checklist: [`p2play-core` Presence Guide](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md).
 
 ---
 
@@ -316,8 +345,9 @@ Run `node download-games.js` in Hub: it downloads `dist.zip`, requires `hub-mani
 
 ---
 
-## 🎙️ Voice Chat & Spectator Mode
+## 🎙️ Voice, Spectator & Presence
 
-`p2play-core` provides `p2play-core/voice` and `p2play-core/spectator` modules. Read the dedicated guides:
+`p2play-core` provides modular capabilities. Read the dedicated guides:
 - 👁️ **[`p2play-core` Spectator Guide](https://github.com/gab371/p2play-core/blob/main/docs/spectator-guide.md)**
 - 🎙️ **[`p2play-core` Voice Chat Guide](https://github.com/gab371/p2play-core/blob/main/docs/voice-chat-guide.md)**
+- ♻️ **[`p2play-core` Presence & Reconnect Guide](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md)** (grace 60s, `REQUEST_RECONNECT`, JOIN seat — **required** for mid-game F5)
