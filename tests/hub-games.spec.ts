@@ -90,6 +90,8 @@ async function waitForBoard(host: Page, marker: RegExp, label: string) {
 
 /** Return to the hub lobby via the top-left button. */
 async function returnToHub(host: Page) {
+  // Board expand hides the lobby button — Escape collapses it first.
+  await host.keyboard.press("Escape");
   await host.getByRole("button", { name: /← Lobby P2Play/ }).click();
   await expect(host.getByText(/Sélectionner un jeu/i)).toBeVisible({ timeout: 15000 });
 }
