@@ -76,7 +76,7 @@ Hub's peer manager and standalone `PeerManager` run **PING/PONG** heartbeats so 
 
 ### Reconnect boundary (Hub vs game)
 
-| Surface | Behavior (v0.5.0) |
+| Surface | Behavior (v0.6.0) |
 |---------|-------------------|
 | **In-game** (embedded or standalone) | Guest F5 / brief drop → session + `REQUEST_RECONNECT` + engine `remapPlayerId` within grace window |
 | **Hub party room** | Auto-rejoin of the Hub salon after F5 is **not** required for game presence to work; host F5 still kills the room (no host migration) |

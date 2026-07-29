@@ -6,11 +6,12 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 
 ## 📋 Integration Checklist
 
-- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.5.0`).
+- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.6.0`).
 - [ ] **Step 2**: Configure dual build modes (`standalone` & `lib`) in `vite.config.ts`.
 - [ ] **Step 3**: Expose `window.mountXxx` in `src/main.tsx`.
 - [ ] **Step 4**: Use `usePeer` from `p2play-core` to manage P2P connections (standalone and `externalPeerManager`).
-- [ ] **Step 5**: Use shared `<P2PlayLobby />` for the standalone home screen (themed + `classes`); keep connected-room lobby game-specific.
+- [ ] **Step 5**: Use shared `<P2PlayLobby />` for the standalone home screen (themed + `classes`); keep connected-room lobby game-specific. Use `CopyRoomLinkButton` / `RoomCodeBadge` for room URL copy (no text “Copier le lien”).
+- [ ] **Step 5b**: Prefer `TextChatPanel` / `JournalPanel` from `p2play-core/chat` with `scrollbarAccent`.
 - [ ] **Step 6**: Adapt `useGame.ts` / `App.tsx` to auto-populate players and bypass local home screen when `isEmbedded` is active.
 - [ ] **Step 6b**: Wire **`p2play-core/presence`** (`attachPresenceHandlers` + engine `remapPlayerId`) for disconnect grace / F5 reconnect.
 - [ ] **Step 7**: Configure CI/CD GitHub Actions workflow (`deploy.yml`) to build `dist.zip` and `standalone.zip`.
@@ -25,7 +26,7 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 Add `p2play-core` to your game's `package.json`:
 
 ```bash
-npm install github:gab371/p2play-core#v0.5.0
+npm install github:gab371/p2play-core#v0.6.0
 ```
 
 ---

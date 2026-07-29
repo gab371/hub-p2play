@@ -21,8 +21,8 @@ All WebRTC network transport, voice chat, and room management rely on the unifie
 ## 🛠️ Tech Stack
 
 - **Unified Network Engine**: [`p2play-core`](https://github.com/gab371/p2play-core) (PeerJS WebRTC transport, session handover, heartbeat, voice, spectator, **presence / reconnect**).
-- **UI Framework**: React 18 / 19, TypeScript, Tailwind CSS, Lucide React.
-- **Build Tool**: Vite (ES Modules support & dynamic script injection).
+- **UI Framework**: React 19, TypeScript, Tailwind CSS, shadcn/ui, Lucide React.
+- **Build Tool**: Vite (ES Modules support & dynamic script injection; `resolve.dedupe` for React).
 - **Automation**: Node.js (`download-games.js`) for downloading GitHub releases.
 
 ---
@@ -44,16 +44,18 @@ node download-games.js
 ```bash
 npm run dev
 ```
-Open your browser at `http://localhost:3004`.
+Open your browser at `http://localhost:3004` (or the port Vite prints).
+
+> **Local lib builds:** `npm run dev` re-runs `download-games.js` and **overwrites** `public/games/` with GitHub zips. To test locally built game bundles, copy them into `public/games/{key}/` then run `npx vite` or `npm run catalog` (`--catalog-only`) instead of a full `download-games` pass.
 
 ---
 
 ## 📚 Technical Documentation
 
-- 🌐 **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**: P2P engine, voice, spectator, session & presence guides.
+- 🌐 **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)**: P2P engine, voice, spectator, session, presence, lobby & room-link UI (`RoomCodeBadge`).
 - 🏛️ **[Hub Architecture](docs/architecture.md)**: Persistent P2P Party Group, WebRTC handover, SPA lifecycle, and in-game reconnect boundary.
 - 🔌 **[Mount Contract (`window.mountXxx`)](docs/game-mount-contract.md)**: Specification for game ES Module bundles.
-- 🛠️ **[Developer Guide: Add a New Game](docs/developer-guide-new-game.md)**: Step-by-step tutorial (`p2play-core` ≥ v0.5.0, presence, Vite, releases).
+- 🛠️ **[Developer Guide: Add a New Game](docs/developer-guide-new-game.md)**: Step-by-step tutorial (`p2play-core` ≥ v0.6.0, presence, Vite, releases).
 
 ---
 
@@ -66,15 +68,19 @@ Open your browser at `http://localhost:3004`.
   "games": {
     "skull": {
       "repo": "gab371/skull-and-roses",
-      "version": "v0.3.0"
+      "version": "v0.6.0"
     },
     "royal": {
       "repo": "gab371/royal-bluff",
-      "version": "v0.3.0"
+      "version": "v0.6.0"
     },
     "sheriff": {
       "repo": "gab371/sheriff-smugglers",
-      "version": "v0.3.0"
+      "version": "v1.6.0"
+    },
+    "pool": {
+      "repo": "gab371/billard-p2play",
+      "version": "v0.6.0"
     }
   }
 }
