@@ -229,13 +229,13 @@ export default function App() {
       )}
 
       {enableHubVoice && hub.enableVoice && hub.roomId && (
-        <div className="fixed top-24 left-4 z-[200]">
-          <VoiceChatPanel
-            peerManager={hub.externalPeerManager}
-            username={hub.players.find((p) => p.peerId === hub.myPeerId)?.username}
-            avatar={hub.players.find((p) => p.peerId === hub.myPeerId)?.avatar || "👑"}
-          />
-        </div>
+        <VoiceChatPanel
+          peerManager={hub.externalPeerManager}
+          username={hub.players.find((p) => p.peerId === hub.myPeerId)?.username}
+          avatar={hub.players.find((p) => p.peerId === hub.myPeerId)?.avatar || "👑"}
+          draggable
+          dragStorageKey="p2play-hub-voice-bubble"
+        />
       )}
     </TooltipProvider>
   );

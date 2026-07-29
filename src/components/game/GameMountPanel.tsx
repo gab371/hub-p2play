@@ -57,6 +57,21 @@ export function GameMountPanel({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Game board pseudo-fullscreen — hide hub chrome (lobby exit) over the play area. */
+  const [boardExpanded, setBoardExpanded] = useState(false);
+
+  useEffect(() => {
+    const onExpand = (e: Event) => {
+      const detail = (e as CustomEvent<{ expanded?: boolean }>).detail;
+      setBoardExpanded(Boolean(detail?.expanded));
+    };
+    window.addEventListener("p2play:board-expand", onExpand);
+    return () => {
+      window.removeEventListener("p2play:board-expand", onExpand);
+      setBoardExpanded(false);
+    };
+  }, [gameName]);
+
 
   const customMeta = resolveCustomMeta(gameName);
   const isCustom = Boolean(customMeta) || isCustomGameKey(gameName);
@@ -187,22 +202,23 @@ export function GameMountPanel({
       style={{ background: resolvedShellBackground }}
       data-p2play-game-shell={gameName}
     >
-      {isHost ? (
-        <button
-          onClick={onExit}
-          className="fixed top-4 left-4 z-[100] flex items-center gap-2 bg-zinc-900/90 hover:bg-zinc-800 text-amber-400 font-bold px-4 py-2 rounded-xl backdrop-blur-md border border-amber-500/30 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
-        >
-          ← Lobby P2Play
-        </button>
-      ) : (
-        <button
-          onClick={() => (onLeave ? onLeave() : onExit())}
-          className="fixed top-4 left-4 z-[100] flex items-center gap-2 bg-zinc-900/90 hover:bg-zinc-800 text-rose-400 font-bold px-4 py-2 rounded-xl backdrop-blur-md border border-rose-500/30 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          title="Quitter le Hub (la partie continue pour les autres)"
-        >
-          Quitter le Hub
-        </button>
-      )}
+      {!boardExpanded &&
+        (isHost ? (
+          <button
+            onClick={onExit}
+            className="fixed top-4 left-4 z-[100] flex items-center gap-2 bg-zinc-900/90 hover:bg-zinc-800 text-amber-400 font-bold px-4 py-2 rounded-xl backdrop-blur-md border border-amber-500/30 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            ← Lobby P2Play
+          </button>
+        ) : (
+          <button
+            onClick={() => (onLeave ? onLeave() : onExit())}
+            className="fixed top-4 left-4 z-[100] flex items-center gap-2 bg-zinc-900/90 hover:bg-zinc-800 text-rose-400 font-bold px-4 py-2 rounded-xl backdrop-blur-md border border-rose-500/30 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            title="Quitter le Hub (la partie continue pour les autres)"
+          >
+            Quitter le Hub
+          </button>
+        ))}
 
       {loading && (
         <div className="flex flex-col items-center justify-center h-full gap-3 py-12">

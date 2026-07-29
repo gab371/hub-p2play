@@ -120,6 +120,15 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Local monorepo iteration: voice drag + latest core without npm reinstall
+      "p2play-core/voice": path.resolve(__dirname, "../p2play-core/dist/voice/index.js"),
+      "p2play-core/ui": path.resolve(__dirname, "../p2play-core/dist/ui/index.js"),
+      "p2play-core/chat": path.resolve(__dirname, "../p2play-core/dist/chat/index.js"),
+      "p2play-core/session": path.resolve(__dirname, "../p2play-core/dist/session/index.js"),
+      "p2play-core/presence": path.resolve(__dirname, "../p2play-core/dist/presence/index.js"),
+      "p2play-core/spectator": path.resolve(__dirname, "../p2play-core/dist/spectator/index.js"),
+      "p2play-core/url": path.resolve(__dirname, "../p2play-core/dist/url/index.js"),
+      "p2play-core": path.resolve(__dirname, "../p2play-core/dist/index.js"),
     },
   },
 })
