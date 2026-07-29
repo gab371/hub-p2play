@@ -39,16 +39,16 @@ export function Lobby({ status, onCreate, onJoin }: LobbyProps) {
         inputGroup: "text-left",
         labelWrapper: "mb-2",
         label: "block text-xs font-bold uppercase tracking-wider text-zinc-500",
-        input: "w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-850 focus:border-violet-500 text-zinc-150 outline-none transition-all disabled:opacity-50 text-center font-bold",
-        hr: "border-t border-zinc-850 my-4",
+        input: "w-full px-4 py-3 rounded-2xl bg-[#09090b] dark:bg-[#09090b] border border-zinc-800 focus:border-violet-500 text-zinc-100 outline-none transition-all disabled:opacity-50 text-center font-bold",
+        hr: "border-t border-zinc-800 my-4",
         actionGroup: "flex flex-col gap-3",
         createButton: "w-full py-3.5 px-6 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-violet-900/30",
         divider: "relative flex items-center justify-center my-4",
-        dividerLine: "flex-grow border-t border-zinc-850",
+        dividerLine: "flex-grow border-t border-zinc-800",
         dividerText: "relative flex-shrink-0 px-3 text-xs uppercase font-bold text-zinc-500 bg-zinc-900",
         joinWrapper: "space-y-3",
-        joinInput: "w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-850 focus:border-violet-500 text-zinc-150 outline-none transition-all disabled:opacity-50 text-center font-bold tracking-widest uppercase font-mono",
-        joinButton: "w-full py-3.5 px-6 rounded-2xl bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-750 font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed",
+        joinInput: "w-full px-4 py-3 rounded-2xl bg-[#09090b] dark:bg-[#09090b] border border-zinc-800 focus:border-violet-500 text-zinc-100 outline-none transition-all disabled:opacity-50 text-center font-bold tracking-widest uppercase font-mono",
+        joinButton: "w-full py-3.5 px-6 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed",
       }}
     />
   );

@@ -1,6 +1,17 @@
 import { useState } from "react";
-import { X, Download, AlertCircle, CheckCircle2, Loader2, Sparkles, Globe } from "lucide-react";
+import { Download, AlertCircle, CheckCircle2, Loader2, Sparkles, Globe } from "lucide-react";
 import { fetchAndPrepareCustomGame, type CustomGameMeta } from "../../utils/customGameLoader";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export interface QuickGameExample {
   label: string;
@@ -26,8 +37,6 @@ export function AddGameModal({
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMeta, setSuccessMeta] = useState<CustomGameMeta | null>(null);
-
-  if (!isOpen) return null;
 
   const handleAddGame = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -59,138 +68,125 @@ export function AddGameModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-game-title"
-        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative space-y-6"
+    <Dialog open={isOpen} onOpenChange={(o) => !o && !loading && onClose()}>
+      <DialogContent
+        className="sm:max-w-lg gap-6 p-6 md:p-8"
+        showCloseButton={!loading}
+        onPointerDownOutside={(e) => loading && e.preventDefault()}
+        onEscapeKeyDown={(e) => loading && e.preventDefault()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-violet-950/60 border border-violet-850 rounded-2xl text-violet-400">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 id="add-game-title" className="text-lg font-bold text-zinc-100">
-                Ajouter un jeu GitHub Live
-              </h3>
-              <p className="text-xs text-zinc-400">
-                Chargez une release compatible P2Play (dist.zip + hub-manifest.json)
-              </p>
-            </div>
+        <DialogHeader className="flex-row items-center gap-3 border-b border-border pb-4">
+          <div className="rounded-2xl border border-primary/30 bg-primary/10 p-2.5 text-primary">
+            <Sparkles className="size-5" />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50"
-            aria-label="Fermer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <div className="flex flex-col gap-1 text-left">
+            <DialogTitle className="text-lg font-bold">
+              Ajouter un jeu GitHub Live
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Chargez une release compatible P2Play (dist.zip + hub-manifest.json)
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
-        <form onSubmit={handleAddGame} className="space-y-4">
-          <div>
-            <label htmlFor="github-game-url" className="block text-xs font-semibold text-zinc-300 mb-2">
+        <form onSubmit={handleAddGame} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="github-game-url" className="text-xs font-semibold text-foreground">
               URL ou slug du dépôt GitHub
             </label>
             <div className="relative">
-              <Globe className="w-5 h-5 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
+              <Globe className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
                 id="github-game-url"
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="owner/repo ou https://github.com/owner/repo"
                 disabled={loading}
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-violet-500 text-zinc-100 rounded-2xl pl-11 pr-4 py-3 text-sm focus:outline-none transition-all placeholder:text-zinc-600 disabled:opacity-60"
+                className="h-11 pl-11"
               />
             </div>
           </div>
 
           {examples.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-[11px] text-zinc-400 font-medium">Exemples rapides :</span>
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Exemples rapides :
+              </span>
               <div className="flex flex-wrap gap-2">
                 {examples.map((ex) => (
-                  <button
+                  <Button
                     key={ex.slug}
                     type="button"
+                    variant="outline"
+                    size="sm"
                     data-quick-example={ex.slug}
                     onClick={() => {
                       setUrlInput(ex.slug);
                       setError(null);
                     }}
                     disabled={loading}
-                    className="px-3 py-1.5 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-850 hover:border-zinc-700 text-zinc-300 text-xs rounded-xl font-medium transition-all"
                   >
                     {ex.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
           )}
 
           {loading && (
-            <div className="p-4 bg-violet-950/20 border border-violet-850/60 rounded-2xl flex items-center gap-3">
-              <Loader2 className="w-5 h-5 text-violet-400 animate-spin flex-shrink-0" />
-              <span className="text-xs font-semibold text-violet-300">
+            <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+              <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+              <span className="text-xs font-semibold text-primary">
                 {progressMsg || "Chargement du jeu en cours…"}
               </span>
             </div>
           )}
 
           {error && (
-            <div className="p-4 bg-rose-950/30 border border-rose-900/50 rounded-2xl flex items-start gap-3 text-rose-300">
-              <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
-              <div className="text-xs space-y-1">
-                <span className="font-bold block">Erreur de chargement</span>
+            <div className="flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+              <AlertCircle className="mt-0.5 size-5 shrink-0" />
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="font-bold">Erreur de chargement</span>
                 <span>{error}</span>
               </div>
             </div>
           )}
 
           {successMeta && (
-            <div className="p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-2xl flex items-center gap-3 text-emerald-300">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-emerald-300",
+              )}
+            >
+              <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
               <div className="text-xs">
-                <span className="font-bold block">Jeu prêt !</span>
+                <span className="block font-bold">Jeu prêt !</span>
                 <span>&quot;{successMeta.name}&quot; ajouté au Hub.</span>
               </div>
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
-            >
+          <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0 pt-2 sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
               Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={!urlInput.trim() || loading}
-              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-violet-950/50 disabled:opacity-50 flex items-center gap-2"
-            >
+            </Button>
+            <Button type="submit" disabled={!urlInput.trim() || loading}>
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Chargement…</span>
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
+                  Chargement…
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4" />
-                  <span>Ajouter le jeu</span>
+                  <Download data-icon="inline-start" />
+                  Ajouter le jeu
                 </>
               )}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

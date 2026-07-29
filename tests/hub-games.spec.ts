@@ -292,7 +292,7 @@ test("Room URL Sharing — auto-fills room code & copy link works", async ({ bro
     const copyBtn = host.getByRole("button", { name: /Copier le lien/i });
     await expect(copyBtn).toBeVisible();
     await copyBtn.click();
-    await expect(host.getByText(/Lien copié !/i)).toBeVisible();
+    await expect(host.getByRole("button", { name: /Lien copié/i })).toBeVisible();
 
     // 3. Guest opens URL with #/ROOMCODE directly
     const directUrl = `${HUB}/#/${roomCode}`;

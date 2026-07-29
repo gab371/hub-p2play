@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface AvatarSelectorProps {
   selectedAvatar: string;
@@ -21,58 +23,61 @@ export function AvatarSelector({
 
   const gridClass =
     layout === "grid"
-      ? "grid grid-cols-7 gap-2 p-3 bg-zinc-950 border border-zinc-850 rounded-2xl justify-items-center"
-      : "flex flex-wrap gap-2 p-3 bg-zinc-950 border border-zinc-850 rounded-2xl";
+      ? "grid grid-cols-7 gap-2 justify-items-center rounded-2xl border border-zinc-800 bg-zinc-950 p-3"
+      : "flex flex-wrap gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 p-3";
 
   return (
-    <div className="space-y-3 text-left">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-3 text-left">
+      <div className="flex items-center justify-between gap-2">
         <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
           Choisir votre Émote
         </label>
-        <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-850 text-xs">
-          <button
+        <div className="flex gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+          <Button
             type="button"
+            size="xs"
+            variant={tab === "p2play" ? "default" : "ghost"}
+            className="rounded-lg"
             onClick={() => setTab("p2play")}
-            className={`px-3 py-1 rounded-lg font-bold transition-all ${
-              tab === "p2play"
-                ? "bg-violet-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
           >
             P2Play
-          </button>
+          </Button>
           {gameAvatars.length > 0 && (
-            <button
+            <Button
               type="button"
+              size="xs"
+              variant={tab === "game" ? "default" : "ghost"}
+              className="rounded-lg"
               onClick={() => setTab("game")}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                tab === "game"
-                  ? "bg-violet-600 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
             >
               Émotes du Jeu
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       <div className={gridClass}>
-        {(tab === "p2play" ? P2PLAY_AVATARS : gameAvatars).map((avatar) => (
-          <button
-            key={avatar}
-            type="button"
-            onClick={() => onSelectAvatar(avatar)}
-            className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center transition-all ${
-              selectedAvatar === avatar
-                ? "bg-violet-600 border-2 border-violet-400 scale-110 shadow-lg shadow-violet-900/40"
-                : "bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:scale-105"
-            }`}
-          >
-            {avatar}
-          </button>
-        ))}
+        {(tab === "p2play" ? P2PLAY_AVATARS : gameAvatars).map((avatar) => {
+          const selected = selectedAvatar === avatar;
+          return (
+            <Button
+              key={avatar}
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onSelectAvatar(avatar)}
+              aria-pressed={selected}
+              className={cn(
+                "size-10 rounded-xl border-2 border-transparent bg-transparent text-xl shadow-none transition-all",
+                "hover:bg-zinc-800 hover:text-inherit dark:hover:bg-zinc-800",
+                selected &&
+                  "scale-110 border-violet-400 bg-violet-600/80 shadow-[0_0_14px_rgba(139,92,246,0.7)] hover:bg-violet-600/80",
+              )}
+            >
+              {avatar}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

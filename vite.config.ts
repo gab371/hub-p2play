@@ -116,6 +116,8 @@ export default defineConfig({
   base: './',
   plugins: [react(), githubProxyPlugin()],
   resolve: {
+    // file:../p2play-core brings its own node_modules/react — force one copy
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },

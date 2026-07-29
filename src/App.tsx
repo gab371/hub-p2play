@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { formatHubGameLabel } from "p2play-core";
+import { formatHubGameLabel, CopyRoomLinkButton } from "p2play-core";
+import { SoundToggle } from "p2play-core/ui";
 import { useHub } from "./hooks/useHub";
 import { useGamesCatalog } from "./hooks/useGamesCatalog";
 import { Lobby } from "./components/game/Lobby";
@@ -8,17 +9,19 @@ import { AddGameModal } from "./components/game/AddGameModal";
 import { GameSelectionPanel } from "./components/game/GameSelectionPanel";
 import { AvatarSelector } from "./components/game/AvatarSelector";
 import { Gamepad2 } from "lucide-react";
-import { SoundToggle } from "./components/ui/SoundToggle";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { VoiceChatPanel } from "p2play-core/voice";
 import { TextChatPanel } from "p2play-core/chat";
-import { copyRoomUrlToClipboard } from "p2play-core/url";
 import { resolveCustomMountFnName } from "./utils/customGameLoader";
 import { isLiveGamesEnabled } from "./utils/liveGamesFlag";
+import { soundManager } from "./core/soundFX";
 
 export default function App() {
   const hub = useHub();
   const { games: catalogGames, loading: catalogLoading, error: catalogError } = useGamesCatalog();
-  const [copied, setCopied] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const enableHubVoice = import.meta.env.VITE_ENABLE_VOICE_CHAT !== "false";
   const enableLiveGames = isLiveGamesEnabled();
@@ -66,21 +69,11 @@ export default function App() {
   const selectedGameObj = allGames.find((g) => g.key === hub.selectedGame);
   const activeGameObj = allGames.find((g) => g.key === hub.activeGame);
 
-  const handleCopy = () => {
-    if (hub.roomId) {
-      copyRoomUrlToClipboard(hub.roomId).then((success) => {
-        if (success) {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }
-      });
-    }
-  };
-
   const showLobby = !hub.roomId;
 
   return (
-    <>
+    <TooltipProvider>
+      <Toaster />
       {hub.activeGame ? (
         <GameMountPanel
           gameName={hub.activeGame}
@@ -115,32 +108,35 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <SoundToggle className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800" />
+              <SoundToggle soundManager={soundManager} />
               {hub.roomId && (
                 <div className="flex items-center gap-3 text-xs">
-                  <span className="bg-emerald-950/80 border border-emerald-800 text-emerald-400 px-3 py-1.5 rounded-full font-bold">
+                  <Badge variant="secondary" className="h-auto border-emerald-800 bg-emerald-950/80 px-3 py-1.5 text-emerald-400">
                     Salon Connecté
-                  </span>
-                  <span className={hub.enableVoice ? "bg-violet-950/80 border border-violet-800 text-violet-300 px-3 py-1.5 rounded-full font-bold" : "bg-zinc-900 border border-zinc-800 text-zinc-500 px-3 py-1.5 rounded-full font-bold"}>
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      hub.enableVoice
+                        ? "h-auto border-violet-800 bg-violet-950/80 px-3 py-1.5 text-violet-300"
+                        : "h-auto border-zinc-800 bg-zinc-900 px-3 py-1.5 text-zinc-500"
+                    }
+                  >
                     {hub.enableVoice ? "🎙️ Vocal Actif" : "🔇 Vocal Désactivé"}
-                  </span>
-                  <span className="text-zinc-400 font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-850">
-                    Code : <span className="text-violet-400 font-bold">{hub.roomId}</span>
-                  </span>
-                  <button
-                    onClick={handleCopy}
-                    className="px-2.5 py-1.5 bg-violet-950/40 hover:bg-violet-900/40 text-violet-300 font-bold rounded-xl border border-violet-800/50 transition-all flex items-center gap-1"
-                    title="Copier le lien d'invitation direct pour ce salon"
-                  >
-                    <span>🔗</span>
-                    <span>{copied ? "Lien copié !" : "Copier le lien"}</span>
-                  </button>
-                  <button
-                    onClick={hub.disconnect}
-                    className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/20 text-rose-400 border border-rose-900/30 rounded-xl font-bold transition-all"
-                  >
+                  </Badge>
+                  <Badge variant="outline" className="h-auto gap-1 py-1 pl-3 pr-1 font-mono text-zinc-400">
+                    Code : <span className="font-bold text-violet-400">{hub.roomId}</span>
+                    {hub.roomId && (
+                      <CopyRoomLinkButton
+                        code={hub.roomId}
+                        className="text-zinc-400 hover:text-violet-300"
+                        iconClassName="size-3"
+                      />
+                    )}
+                  </Badge>
+                  <Button type="button" size="sm" variant="destructive" onClick={hub.disconnect}>
                     Quitter
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -154,27 +150,25 @@ export default function App() {
                 onJoin={hub.joinRoom}
               />
             ) : (
-              <div className="max-w-2xl mx-auto space-y-8">
-                <div className="p-6 bg-zinc-900/40 border border-zinc-850 rounded-3xl shadow-xl space-y-4">
+              <div className="max-w-2xl mx-auto flex flex-col gap-8">
+                <div className="flex flex-col gap-4 rounded-3xl border border-zinc-850 bg-zinc-900/40 p-6 shadow-xl">
                   <h2 className="text-xl font-bold text-zinc-200">👥 Joueurs Connectés ({hub.players.length})</h2>
                   <div className="flex flex-wrap gap-2">
                     {hub.players.map((p, idx) => (
-                      <span
+                      <Badge
                         key={p.peerId}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${p.peerId === hub.myPeerId
-                            ? "bg-violet-950/30 border-violet-850 text-violet-400"
-                            : "bg-zinc-900 border-zinc-800 text-zinc-400"
-                          }`}
+                        variant={p.peerId === hub.myPeerId ? "default" : "outline"}
+                        className="h-auto gap-1.5 px-3 py-1.5"
                       >
                         <span className="text-base">{p.avatar || (idx === 0 ? "👑" : "👤")}</span>
                         <span>{p.username}</span>
                         {p.peerId === hub.myPeerId && <span className="text-[10px] opacity-60">(Vous)</span>}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </div>
 
-                <div className="p-6 bg-zinc-900/40 border border-zinc-850 rounded-3xl shadow-xl">
+                <div className="rounded-3xl border border-zinc-850 bg-zinc-900/40 p-6 shadow-xl">
                   <AvatarSelector
                     selectedAvatar={hub.players.find((p) => p.peerId === hub.myPeerId)?.avatar || "👑"}
                     onSelectAvatar={hub.updateAvatar}
@@ -205,6 +199,7 @@ export default function App() {
                   emptyLabel="Aucun message. L'historique est conservé entre les jeux."
                   className="bg-zinc-900/40 border border-zinc-850 rounded-3xl p-5 shadow-xl flex flex-col text-zinc-100 text-sm"
                   maxHeight="220px"
+                  scrollbarAccent="violet"
                 />
               </div>
             )}
@@ -242,6 +237,6 @@ export default function App() {
           />
         </div>
       )}
-    </>
+    </TooltipProvider>
   );
 }
