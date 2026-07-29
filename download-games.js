@@ -17,6 +17,7 @@ const LOCAL_MANIFEST_SOURCES = {
   royal: path.join(__dirname, '..', 'royal-bluff', 'public', MANIFEST_FILENAME),
   sheriff: path.join(__dirname, '..', 'Sherif-de-Nottingham', 'public', MANIFEST_FILENAME),
   pool: path.join(__dirname, '..', 'billard-p2play', 'public', MANIFEST_FILENAME),
+  uno: path.join(__dirname, '..', 'uno-p2play', 'public', MANIFEST_FILENAME),
 };
 
 if (!fs.existsSync(publicGamesDir)) {
