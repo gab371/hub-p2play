@@ -131,32 +131,41 @@ export class HubPeerManager implements PeerManagerLike {
         return;
       }
       if (data.type === 'PLAYER_JOINED' && this.isHost) {
-        // Add new player to lobby mapping
+        // Identity is the DataConnection peer — never trust data.sender from the client.
+        const peerId = conn.peer;
         const playerObj = typeof data.payload === 'string' 
           ? { username: data.payload, avatar: "👑" } 
           : data.payload;
-        if (!this.lobbyPlayers.some(p => p.peerId === data.sender)) {
-          this.lobbyPlayers.push({ peerId: data.sender, username: playerObj.username, avatar: playerObj.avatar || "👑" });
+        if (!this.lobbyPlayers.some(p => p.peerId === peerId)) {
+          this.lobbyPlayers.push({
+            peerId,
+            username: playerObj.username || `Joueur-${peerId.slice(0, 4)}`,
+            avatar: playerObj.avatar || "👑",
+          });
         }
         // Broadcast the updated list to all players
         this.broadcast({ type: 'SYNC_LOBBY', payload: this.lobbyPlayers });
         // Sync the current Hub state (selected game / active game / config) to the late joiner
-        this.send(data.sender, { type: 'SYNC_HUB_STATE', payload: this.getHubState(), sender: this.myPeerId || "" });
-        this.send(data.sender, { type: 'CHAT_HISTORY_SYNC', messages: this.chatHistory });
+        this.send(peerId, { type: 'SYNC_HUB_STATE', payload: this.getHubState(), sender: this.myPeerId || "" });
+        this.send(peerId, { type: 'CHAT_HISTORY_SYNC', messages: this.chatHistory });
         if (this.onPlayersUpdate) this.onPlayersUpdate();
+        return;
       } else if (data.type === 'UPDATE_AVATAR' && this.isHost) {
-        const player = this.lobbyPlayers.find(p => p.peerId === data.sender);
+        const player = this.lobbyPlayers.find(p => p.peerId === conn.peer);
         if (player) {
           player.avatar = data.payload;
           this.broadcast({ type: 'SYNC_LOBBY', payload: this.lobbyPlayers });
           if (this.onPlayersUpdate) this.onPlayersUpdate();
         }
+        return;
       } else if (data.type === 'SYNC_LOBBY') {
+        // Host-owned — clients only accept from the room host.
+        if (this.isHost || conn.peer !== this.hostPeerId) return;
         this.lobbyPlayers = data.payload;
         if (this.onPlayersUpdate) this.onPlayersUpdate();
 
         // Full Mesh Auto-Connection: establish direct PeerJS DataConnection to all non-host peers
-        if (!this.isHost && Array.isArray(this.lobbyPlayers)) {
+        if (Array.isArray(this.lobbyPlayers)) {
           this.lobbyPlayers.forEach(p => {
             if (p.peerId && p.peerId !== this.myPeerId && !this.connections.has(p.peerId)) {
               const peerConn = this.peer?.connect(p.peerId);
@@ -166,52 +175,110 @@ export class HubPeerManager implements PeerManagerLike {
             }
           });
         }
+        return;
       } else if (data.type === 'SYNC_HUB_STATE') {
+        if (this.isHost || conn.peer !== this.hostPeerId) return;
         this.applyHubState(data.payload);
-      }
-
-      if (this.onMessage) {
-        this.onMessage(conn.peer, data);
+        return;
       }
 
       // Game-level message routing (embedded games reuse this peer manager)
       switch (data.type) {
         case 'STATE_UPDATE':
+          // Only the host may push game state (guests must not inject via mesh).
+          if (!this.isHost && conn.peer !== this.hostPeerId) return;
+          if (this.isHost) return; // host engine is authoritative locally
           if (this.onStateReceived && data.state) this.onStateReceived(data.state);
           return;
-        case 'CHAT':
-          this.chatHistory = [...this.chatHistory.slice(-199), data];
-          if (this.onChatReceived) this.onChatReceived(data);
-          if (this.isHost) this.broadcast(data, conn.peer); // relay to other merchants
+        case 'CHAT': {
+          if (this.isHost) {
+            const safe: ChatMessage = {
+              type: 'CHAT',
+              sender: this.resolveChatSender(conn.peer),
+              text: typeof data.text === 'string' ? data.text : '',
+              time:
+                typeof data.time === 'string' && data.time
+                  ? data.time
+                  : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              senderPeerId: conn.peer,
+            };
+            this.chatHistory = [...this.chatHistory.slice(-199), safe];
+            if (this.onChatReceived) this.onChatReceived(safe);
+            this.broadcast(safe, conn.peer);
+          } else if (conn.peer === this.hostPeerId) {
+            this.chatHistory = [...this.chatHistory.slice(-199), data];
+            if (this.onChatReceived) this.onChatReceived(data);
+          }
           return;
+        }
         case 'CHAT_HISTORY_SYNC':
+          if (this.isHost || conn.peer !== this.hostPeerId) return;
           if (data.messages && Array.isArray(data.messages)) {
             this.chatHistory = data.messages;
             if (this.onChatHistorySync) this.onChatHistorySync(this.chatHistory);
           }
           return;
         case 'AUDIO_EVENT':
-          if (this.onAudioReceived && data.sfx) this.onAudioReceived(data.sfx);
-          if (this.isHost) this.broadcast(data, conn.peer); // relay to other merchants
+          if (this.isHost) {
+            if (this.onAudioReceived && data.sfx) this.onAudioReceived(data.sfx);
+            this.broadcast(data, conn.peer);
+          } else if (conn.peer === this.hostPeerId && this.onAudioReceived && data.sfx) {
+            this.onAudioReceived(data.sfx);
+          }
           return;
-        case 'VOICE_STATE_UPDATE':
+        case 'VOICE_STATE_UPDATE': {
+          if (this.isHost) {
+            const safe = {
+              type: 'VOICE_STATE_UPDATE' as const,
+              sender: conn.peer,
+              voiceState: {
+                ...(data.voiceState && typeof data.voiceState === 'object' ? data.voiceState : {}),
+                peerId: conn.peer,
+                username: this.resolveChatSender(conn.peer),
+              },
+            };
+            if (this.onVoiceMessage) this.onVoiceMessage(safe);
+            this.broadcast(safe, conn.peer);
+          } else if (conn.peer === this.hostPeerId && this.onVoiceMessage) {
+            this.onVoiceMessage(data);
+          }
+          return;
+        }
         case 'VOICE_MODERATION_ACTION':
-          if (this.onVoiceMessage) this.onVoiceMessage(data);
-          if (this.isHost) this.broadcast(data, conn.peer);
+          // Only host may moderate; guests ignore peer injections.
+          if (this.isHost) return;
+          if (conn.peer === this.hostPeerId && this.onVoiceMessage) this.onVoiceMessage(data);
           return;
         case 'ACTION':
           if (this.isHost && this.hostActionHandler) this.hostActionHandler(conn.peer, data);
-          return; // host engine processes; do not relay raw actions
+          return;
+        case 'SHOT_FRAME':
+          // Host engine broadcasts frames; never relay guest-injected frames.
+          if (this.isHost) return;
+          if (conn.peer === this.hostPeerId && this.onCustomMessage) this.onCustomMessage(data);
+          return;
+        case 'SELECT_GAME':
+        case 'START_GAME':
+        case 'RETURN_TO_HUB':
+          // Legacy hub control — host-owned only (prefer SYNC_HUB_STATE).
+          if (!this.isHost && conn.peer === this.hostPeerId && this.onMessage) {
+            this.onMessage(conn.peer, data);
+          }
+          return;
+        case 'PLAYER_JOINED':
+        case 'UPDATE_AVATAR':
+        case 'REGISTER_SESSION':
+        case 'REQUEST_RECONNECT':
+          if (this.isHost && this.hostActionHandler && (data.type === 'REGISTER_SESSION' || data.type === 'REQUEST_RECONNECT')) {
+            this.hostActionHandler(conn.peer, data);
+          }
+          return;
         default:
-          if (this.onCustomMessage) this.onCustomMessage(data);
-          break;
-      }
-
-      // If we are host, broadcast non-join hub messages to other clients.
-      // SYNC_LOBBY / SYNC_HUB_STATE are host-owned and must never be relayed from a client.
-      if (this.isHost && data.type !== 'PLAYER_JOINED' && data.type !== 'UPDATE_AVATAR'
-          && data.type !== 'SYNC_LOBBY' && data.type !== 'SYNC_HUB_STATE') {
-        this.broadcast(data, conn.peer);
+          // Do not relay unknown guest messages. Custom host→client only.
+          if (!this.isHost && conn.peer === this.hostPeerId && this.onCustomMessage) {
+            this.onCustomMessage(data);
+          }
+          return;
       }
     });
 
@@ -331,12 +398,32 @@ export class HubPeerManager implements PeerManagerLike {
     if (this.isHost) this.broadcast({ type: 'STATE_UPDATE', state });
   }
 
-  public sendChat(senderName: string, text: string): void {
+  public resolveChatSender(peerId: string | null | undefined): string {
+    if (!peerId) return this.username || "Joueur";
+    const lobby = this.lobbyPlayers.find(
+      (p) => p.peerId === peerId || peerId.endsWith(p.peerId) || p.peerId.endsWith(peerId),
+    );
+    if (lobby?.username) return lobby.username;
+    if (peerId === this.myPeerId && this.username) return this.username;
+    return `Joueur-${peerId.slice(0, 4)}`;
+  }
+
+  public registerPeerProfile(peerId: string, profile: { username: string; avatar?: string }): void {
+    if (!peerId || !profile?.username) return;
+    const existing = this.lobbyPlayers.find((p) => p.peerId === peerId);
+    if (existing) {
+      existing.username = profile.username;
+      if (profile.avatar) existing.avatar = profile.avatar;
+    }
+  }
+
+  public sendChat(_senderName: string, text: string): void {
     const chatMsg: ChatMessage = {
       type: 'CHAT',
-      sender: senderName,
+      sender: this.resolveChatSender(this.myPeerId),
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      senderPeerId: this.myPeerId ?? undefined,
     };
     this.chatHistory = [...this.chatHistory.slice(-199), chatMsg];
     this.onChatReceived?.(chatMsg);

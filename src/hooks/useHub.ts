@@ -59,32 +59,19 @@ export function useHub() {
   );
 
   const broadcastGameSelection = useCallback((gameKey: string) => {
+    // Host-owned room control — guests must not broadcast SELECT_GAME.
+    if (!globalHubPeer.isHost) return;
     setSelectedGame(gameKey);
-    if (globalHubPeer.isHost) {
-      globalHubPeer.setHubSelection(gameKey);
-    } else {
-      globalHubPeer.broadcast({
-        type: "SELECT_GAME",
-        payload: gameKey,
-        sender: globalHubPeer.myPeerId || "",
-      });
-    }
+    globalHubPeer.setHubSelection(gameKey);
   }, []);
 
   const launchGame = useCallback(
     (phase: "GAME_CONFIG" | "GAME_RUNNING" = "GAME_RUNNING") => {
+      if (!globalHubPeer.isHost) return;
       const game = globalHubPeer.selectedGame || selectedGame;
       if (!game) return;
       setActiveGame(game);
-      if (globalHubPeer.isHost) {
-        globalHubPeer.setHubActiveGame(game, phase);
-      } else {
-        globalHubPeer.broadcast({
-          type: "START_GAME",
-          payload: game,
-          sender: globalHubPeer.myPeerId || "",
-        });
-      }
+      globalHubPeer.setHubActiveGame(game, phase);
     },
     [selectedGame],
   );
@@ -93,10 +80,9 @@ export function useHub() {
     setActiveGame(null);
     setSelectedGame(null);
     setGameConfig(null);
+    // Only the host may reset the shared room; guests just leave the local game view.
     if (globalHubPeer.isHost) {
       globalHubPeer.resetHubState();
-    } else {
-      globalHubPeer.broadcast({ type: "RETURN_TO_HUB", sender: globalHubPeer.myPeerId || "" });
     }
   }, []);
 
@@ -141,7 +127,9 @@ export function useHub() {
       if (Array.isArray(state.customGames)) syncCustomGamesFromHub(state.customGames);
     };
 
-    globalHubPeer.onMessage = (_sender, data: GameActionMessage) => {
+    globalHubPeer.onMessage = (sender, data: GameActionMessage) => {
+      // Legacy control messages — only from room host (prefer SYNC_HUB_STATE).
+      if (sender !== globalHubPeer.hostPeerId) return;
       switch (data.type) {
         case "SELECT_GAME":
           setSelectedGame(data.payload);
