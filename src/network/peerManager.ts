@@ -77,9 +77,8 @@ export class HubPeerManager implements PeerManagerLike {
     this.peer.on("open", (id) => {
       this.myPeerId = id;
       this.hostPeerId = roomId;
-      if (isHost) {
-        this.lobbyPlayers[0].peerId = id;
-      }
+      // Always bind local seat id (guests used to stay at "" until SYNC_LOBBY → pseudo "Joueur").
+      if (this.lobbyPlayers[0]) this.lobbyPlayers[0].peerId = id;
       if (this.onStatusChange) this.onStatusChange('CONNECTED');
       if (this.onPlayersUpdate) this.onPlayersUpdate();
 
@@ -116,7 +115,7 @@ export class HubPeerManager implements PeerManagerLike {
       this.onPeerStatusChange?.(conn.peer, 'CONNECTED');
       
       // If we are a client connecting to host, let the host know our username & avatar
-      if (!this.isHost && conn.peer === this.hostPeerId) {
+      if (!this.isHost && this.isHostConnection(conn)) {
         conn.send({ type: 'PLAYER_JOINED', payload: { username: this.username, avatar: this.avatar }, sender: this.myPeerId });
       }
     });
@@ -160,7 +159,7 @@ export class HubPeerManager implements PeerManagerLike {
         return;
       } else if (data.type === 'SYNC_LOBBY') {
         // Host-owned — clients only accept from the room host.
-        if (this.isHost || conn.peer !== this.hostPeerId) return;
+        if (this.isHost || !this.isHostConnection(conn)) return;
         this.lobbyPlayers = data.payload;
         if (this.onPlayersUpdate) this.onPlayersUpdate();
 
@@ -177,7 +176,7 @@ export class HubPeerManager implements PeerManagerLike {
         }
         return;
       } else if (data.type === 'SYNC_HUB_STATE') {
-        if (this.isHost || conn.peer !== this.hostPeerId) return;
+        if (this.isHost || !this.isHostConnection(conn)) return;
         this.applyHubState(data.payload);
         return;
       }
@@ -186,7 +185,7 @@ export class HubPeerManager implements PeerManagerLike {
       switch (data.type) {
         case 'STATE_UPDATE':
           // Only the host may push game state (guests must not inject via mesh).
-          if (!this.isHost && conn.peer !== this.hostPeerId) return;
+          if (!this.isHost && !this.isHostConnection(conn)) return;
           if (this.isHost) return; // host engine is authoritative locally
           if (this.onStateReceived && data.state) this.onStateReceived(data.state);
           return;
@@ -205,14 +204,14 @@ export class HubPeerManager implements PeerManagerLike {
             this.chatHistory = [...this.chatHistory.slice(-199), safe];
             if (this.onChatReceived) this.onChatReceived(safe);
             this.broadcast(safe, conn.peer);
-          } else if (conn.peer === this.hostPeerId) {
+          } else if (this.isHostConnection(conn)) {
             this.chatHistory = [...this.chatHistory.slice(-199), data];
             if (this.onChatReceived) this.onChatReceived(data);
           }
           return;
         }
         case 'CHAT_HISTORY_SYNC':
-          if (this.isHost || conn.peer !== this.hostPeerId) return;
+          if (this.isHost || !this.isHostConnection(conn)) return;
           if (data.messages && Array.isArray(data.messages)) {
             this.chatHistory = data.messages;
             if (this.onChatHistorySync) this.onChatHistorySync(this.chatHistory);
@@ -222,7 +221,7 @@ export class HubPeerManager implements PeerManagerLike {
           if (this.isHost) {
             if (this.onAudioReceived && data.sfx) this.onAudioReceived(data.sfx);
             this.broadcast(data, conn.peer);
-          } else if (conn.peer === this.hostPeerId && this.onAudioReceived && data.sfx) {
+          } else if (this.isHostConnection(conn) && this.onAudioReceived && data.sfx) {
             this.onAudioReceived(data.sfx);
           }
           return;
@@ -239,7 +238,7 @@ export class HubPeerManager implements PeerManagerLike {
             };
             if (this.onVoiceMessage) this.onVoiceMessage(safe);
             this.broadcast(safe, conn.peer);
-          } else if (conn.peer === this.hostPeerId && this.onVoiceMessage) {
+          } else if (this.isHostConnection(conn) && this.onVoiceMessage) {
             this.onVoiceMessage(data);
           }
           return;
@@ -247,7 +246,7 @@ export class HubPeerManager implements PeerManagerLike {
         case 'VOICE_MODERATION_ACTION':
           // Only host may moderate; guests ignore peer injections.
           if (this.isHost) return;
-          if (conn.peer === this.hostPeerId && this.onVoiceMessage) this.onVoiceMessage(data);
+          if (this.isHostConnection(conn) && this.onVoiceMessage) this.onVoiceMessage(data);
           return;
         case 'ACTION':
           if (this.isHost && this.hostActionHandler) this.hostActionHandler(conn.peer, data);
@@ -255,13 +254,13 @@ export class HubPeerManager implements PeerManagerLike {
         case 'SHOT_FRAME':
           // Host engine broadcasts frames; never relay guest-injected frames.
           if (this.isHost) return;
-          if (conn.peer === this.hostPeerId && this.onCustomMessage) this.onCustomMessage(data);
+          if (this.isHostConnection(conn) && this.onCustomMessage) this.onCustomMessage(data);
           return;
         case 'SELECT_GAME':
         case 'START_GAME':
         case 'RETURN_TO_HUB':
           // Legacy hub control — host-owned only (prefer SYNC_HUB_STATE).
-          if (!this.isHost && conn.peer === this.hostPeerId && this.onMessage) {
+          if (!this.isHost && this.isHostConnection(conn) && this.onMessage) {
             this.onMessage(conn.peer, data);
           }
           return;
@@ -275,7 +274,7 @@ export class HubPeerManager implements PeerManagerLike {
           return;
         default:
           // Do not relay unknown guest messages. Custom host→client only.
-          if (!this.isHost && conn.peer === this.hostPeerId && this.onCustomMessage) {
+          if (!this.isHost && this.isHostConnection(conn) && this.onCustomMessage) {
             this.onCustomMessage(data);
           }
           return;
@@ -398,23 +397,41 @@ export class HubPeerManager implements PeerManagerLike {
     if (this.isHost) this.broadcast({ type: 'STATE_UPDATE', state });
   }
 
-  public resolveChatSender(peerId: string | null | undefined): string {
-    if (!peerId) return this.username || "Joueur";
-    const lobby = this.lobbyPlayers.find(
-      (p) => p.peerId === peerId || peerId.endsWith(p.peerId) || p.peerId.endsWith(peerId),
-    );
+  private peerIdsMatch(a: string, b: string): boolean {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.length >= 4 && b.endsWith(a)) return true;
+    if (b.length >= 4 && a.endsWith(b)) return true;
+    return false;
+  }
+
+  private isHostConnection(conn: { peer: string }): boolean {
+    if (!this.hostPeerId) return false;
+    return this.peerIdsMatch(conn.peer, this.hostPeerId);
+  }
+
+  public getTrustedUsername(peerId: string | null | undefined): string | undefined {
+    if (!peerId) return this.username || undefined;
+    const lobby = this.lobbyPlayers.find((p) => this.peerIdsMatch(p.peerId, peerId));
     if (lobby?.username) return lobby.username;
     if (peerId === this.myPeerId && this.username) return this.username;
-    return `Joueur-${peerId.slice(0, 4)}`;
+    return undefined;
+  }
+
+  public resolveChatSender(peerId: string | null | undefined): string {
+    return (
+      this.getTrustedUsername(peerId) ??
+      (peerId ? `Joueur-${peerId.slice(0, 4)}` : this.username || "Joueur")
+    );
   }
 
   public registerPeerProfile(peerId: string, profile: { username: string; avatar?: string }): void {
-    if (!peerId || !profile?.username) return;
-    const existing = this.lobbyPlayers.find((p) => p.peerId === peerId);
-    if (existing) {
-      existing.username = profile.username;
-      if (profile.avatar) existing.avatar = profile.avatar;
-    }
+    if (!peerId) return;
+    const existing = this.lobbyPlayers.find((p) => this.peerIdsMatch(p.peerId, peerId));
+    if (!existing) return;
+    // Lock non-empty salon names; allow fill-in if seat has no username yet.
+    if (!existing.username && profile.username) existing.username = profile.username;
+    if (profile.avatar) existing.avatar = profile.avatar;
   }
 
   public sendChat(_senderName: string, text: string): void {
