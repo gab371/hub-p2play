@@ -6,7 +6,7 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 
 ## 📋 Integration Checklist
 
-- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.6.0`).
+- [ ] **Step 1**: Install `p2play-core` in your game (`npm i github:gab371/p2play-core#v0.6.6`).
 - [ ] **Step 2**: Configure dual build modes (`standalone` & `lib`) in `vite.config.ts`.
 - [ ] **Step 3**: Expose `window.mountXxx` in `src/main.tsx`.
 - [ ] **Step 4**: Use `usePeer` from `p2play-core` to manage P2P connections (standalone and `externalPeerManager`).
@@ -26,7 +26,7 @@ This step-by-step guide explains how to adapt an existing React/TypeScript game 
 Add `p2play-core` to your game's `package.json`:
 
 ```bash
-npm install github:gab371/p2play-core#v0.6.0
+npm install github:gab371/p2play-core#v0.6.6
 ```
 
 ---
@@ -346,9 +346,15 @@ Run `node download-games.js` in Hub: it downloads `dist.zip`, requires `hub-mani
 
 ---
 
-## 🎙️ Voice, Spectator & Presence
+## 🎙️ Voice, Spectator, Presence & Identity
 
 `p2play-core` provides modular capabilities. Read the dedicated guides:
 - 👁️ **[`p2play-core` Spectator Guide](https://github.com/gab371/p2play-core/blob/main/docs/spectator-guide.md)**
 - 🎙️ **[`p2play-core` Voice Chat Guide](https://github.com/gab371/p2play-core/blob/main/docs/voice-chat-guide.md)**
 - ♻️ **[`p2play-core` Presence & Reconnect Guide](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md)** (grace 60s, `REQUEST_RECONNECT`, JOIN seat — **required** for mid-game F5)
+
+**Security (required ≥ v0.6.6):**
+- Actor id on host = DataConnection peer (`senderPeerId`), never `payload.playerId`.
+- `JOIN_GAME` → `handleJoinGameSeat` with `trustedName: peerManager.getTrustedUsername?.(playerId)`.
+- Guests accept `STATE_UPDATE` only from the host connection (do not reimplement a naive `conn.peer === hostPeerId` check in standalone).
+- Hub `games.json` pins must match released game tags after each bump.

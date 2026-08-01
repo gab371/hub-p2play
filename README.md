@@ -46,7 +46,14 @@ npm run dev
 ```
 Open your browser at `http://localhost:3004` (or the port Vite prints).
 
-> **Local lib builds:** `npm run dev` re-runs `download-games.js` and **overwrites** `public/games/` with GitHub zips. To test locally built game bundles, copy them into `public/games/{key}/` then run `npx vite` or `npm run catalog` (`--catalog-only`) instead of a full `download-games` pass.
+> **Local lib builds:** `npm run dev` re-runs `download-games.js` and **overwrites** `public/games/` with GitHub zips. To test locally built game bundles, use the monorepo helper then start Vite without re-download:
+> ```bash
+> # from repo root
+> ./scripts/deploy-local-hub.sh uno          # or: node scripts/deploy-local-hub.mjs uno
+> # from hub-p2play/
+> npm run deploy:local -- uno               # build:lib + copy into public/games/
+> npm run dev:local                         # = npx vite (keeps local copies)
+> ```
 
 ---
 

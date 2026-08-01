@@ -2,23 +2,27 @@
   "games": {
     "skull": {
       "repo": "gab371/skull-and-roses",
-      "version": "v0.6.4"
+      "version": "v0.7.0"
     },
     "royal": {
       "repo": "gab371/royal-bluff",
-      "version": "v0.6.4"
+      "version": "v0.7.0"
     },
     "sheriff": {
       "repo": "gab371/sheriff-smugglers",
-      "version": "v1.6.4"
+      "version": "v1.7.0"
     },
     "pool": {
       "repo": "gab371/billard-p2play",
-      "version": "v0.6.4"
+      "version": "v0.7.0"
     },
     "uno": {
       "repo": "gab371/uno-p2play",
-      "version": "v0.1.6"
+      "version": "v0.2.0"
+    },
+    "pirates": {
+      "repo": "gab371/royal-pirates",
+      "version": "v0.1.0"
     }
   }
 }

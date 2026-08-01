@@ -76,12 +76,13 @@ Hub's peer manager and standalone `PeerManager` run **PING/PONG** heartbeats so 
 
 ### Reconnect boundary (Hub vs game)
 
-| Surface | Behavior (v0.6.0) |
+| Surface | Behavior (v0.6.6+) |
 |---------|-------------------|
-| **In-game** (embedded or standalone) | Guest F5 / brief drop → session + `REQUEST_RECONNECT` + engine `remapPlayerId` within grace window |
+| **In-game** (embedded or standalone) | Guest F5 / brief drop → session + `REQUEST_RECONNECT` (token-checked) + engine `remapPlayerId` within grace window; seat **name** stays locked |
 | **Hub party room** | Auto-rejoin of the Hub salon after F5 is **not** required for game presence to work; host F5 still kills the room (no host migration) |
+| **Authoritative sync** | Guests accept `STATE_UPDATE` / chat / voice only from the host DataConnection; `CHAT.sender` rewritten from salon identity |
 
-For full details on network API, voice, spectator, session, and presence, read the **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)** — especially [Presence & Reconnect](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md).
+For full details on network API, voice, spectator, session, and presence, read the **[`p2play-core` Documentation](https://github.com/gab371/p2play-core)** — especially [Presence & Reconnect](https://github.com/gab371/p2play-core/blob/main/docs/presence-guide.md) and the project-guidelines rule **Network Security & Display Identity**.
 
 ---
 

@@ -18,6 +18,7 @@ const LOCAL_MANIFEST_SOURCES = {
   sheriff: path.join(__dirname, '..', 'Sherif-de-Nottingham', 'public', MANIFEST_FILENAME),
   pool: path.join(__dirname, '..', 'billard-p2play', 'public', MANIFEST_FILENAME),
   uno: path.join(__dirname, '..', 'uno-p2play', 'public', MANIFEST_FILENAME),
+  pirates: path.join(__dirname, '..', 'royal-pirates', 'public', MANIFEST_FILENAME),
 };
 
 if (!fs.existsSync(publicGamesDir)) {
@@ -126,15 +127,27 @@ function refreshCatalogOnly() {
   pruneOrphanGameDirs();
 
   const manifests = [];
+  const missing = [];
   for (const gameKey of configuredKeys) {
     const gameDir = path.join(publicGamesDir, gameKey);
     if (!fs.existsSync(gameDir)) {
-      throw new Error(
-        `Missing public/games/${gameKey}/. Run \`node download-games.js\` once, or copy a built dist there.`
-      );
+      missing.push(gameKey);
+      continue;
     }
     manifests.push(ensureHubManifest(gameKey, gameDir));
     console.log(`Catalog entry OK: ${gameKey}`);
+  }
+
+  if (manifests.length === 0) {
+    throw new Error(
+      "No public/games/{key}/ folders found. Run `node download-games.js` once, or deploy a local lib build."
+    );
+  }
+  if (missing.length > 0) {
+    console.warn(
+      `Skipping missing game folder(s): ${missing.join(", ")} ` +
+        `(run \`node download-games.js\` or \`scripts/deploy-local-hub.sh ${missing.join(" ")}\`).`
+    );
   }
 
   writeCatalog(manifests);
