@@ -14,7 +14,7 @@
     },
     "pool": {
       "repo": "gab371/billard-p2play",
-      "version": "v0.7.0"
+      "version": "v0.6.4"
     },
     "uno": {
       "repo": "gab371/uno-p2play",
