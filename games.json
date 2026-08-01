@@ -18,11 +18,11 @@
     },
     "uno": {
       "repo": "gab371/uno-p2play",
-      "version": "v0.2.0"
+      "version": "v0.2.1"
     },
     "pirates": {
       "repo": "gab371/royal-pirates",
-      "version": "v0.1.2"
+      "version": "v0.1.3"
     }
   }
 }
