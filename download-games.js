@@ -39,17 +39,21 @@ function downloadFile(url, dest) {
     const request = (targetUrl) => {
       https.get(targetUrl, (response) => {
         if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          // Drain redirect body so the socket is released (otherwise Node hangs ~30s after "done").
+          response.resume();
           request(response.headers.location);
-        } else if (response.statusCode === 200) {
+          return;
+        }
+        if (response.statusCode === 200) {
           response.pipe(file);
           file.on('finish', () => {
-            file.close();
-            resolve();
+            file.close((err) => (err ? reject(err) : resolve()));
           });
-        } else {
-          fs.unlink(dest, () => {});
-          reject(new Error(`HTTP ${response.statusCode} from ${targetUrl}`));
+          return;
         }
+        response.resume();
+        fs.unlink(dest, () => {});
+        reject(new Error(`HTTP ${response.statusCode} from ${targetUrl}`));
       }).on('error', (err) => {
         fs.unlink(dest, () => {});
         reject(err);
@@ -230,5 +234,8 @@ if (process.argv.includes('--catalog-only')) {
     process.exit(1);
   }
 } else {
-  prepareGames();
+  prepareGames().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
 }

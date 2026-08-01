@@ -1,6 +1,13 @@
 import Peer from "peerjs";
 import type { DataConnection } from "peerjs";
 import type { ChatMessage, NetworkMessage, PeerManagerLike } from "p2play-core";
+import {
+  clearSession,
+  createSessionToken,
+  loadSession,
+  saveProfile,
+  saveSession,
+} from "p2play-core/session";
 import type { HubPhase, HubState } from "./protocol";
 
 const HEARTBEAT_MS = 5_000;
@@ -47,6 +54,22 @@ export class HubPeerManager implements PeerManagerLike {
   public enableVoice: boolean = true;
   public chatHistory: ChatMessage[] = [];
   public onChatHistorySync: ((messages: ChatMessage[]) => void) | null = null;
+  private sessionToken: string = createSessionToken();
+
+  /** Salon session (reconnect) + durable profile (multi-day pseudo/avatar). */
+  private persistHubSession(): void {
+    if (this.username.trim()) {
+      saveProfile({ username: this.username, avatar: this.avatar });
+    }
+    if (!this.myPeerId || !this.hostPeerId) return;
+    saveSession(this.hostPeerId, {
+      previousPeerId: this.myPeerId,
+      username: this.username,
+      avatar: this.avatar,
+      role: "player",
+      sessionToken: this.sessionToken,
+    });
+  }
 
   public initialize(isHost: boolean, roomId: string, username: string, avatar: string = "👑", enableVoice: boolean = true) {
     this.isHost = isHost;
@@ -54,6 +77,7 @@ export class HubPeerManager implements PeerManagerLike {
     this.avatar = avatar;
     this.enableVoice = enableVoice;
     this.chatHistory = [];
+    this.sessionToken = createSessionToken();
     this.lobbyPlayers = [{ peerId: isHost ? roomId : "", username, avatar }];
     
     const peerId = isHost 
@@ -81,6 +105,9 @@ export class HubPeerManager implements PeerManagerLike {
       if (this.lobbyPlayers[0]) this.lobbyPlayers[0].peerId = id;
       if (this.onStatusChange) this.onStatusChange('CONNECTED');
       if (this.onPlayersUpdate) this.onPlayersUpdate();
+
+      // Host: persist as soon as the salon exists (pseudo restore on F5 without a game).
+      if (isHost) this.persistHubSession();
 
       if (!isHost && roomId) {
         const conn = this.peer!.connect(roomId);
@@ -114,9 +141,26 @@ export class HubPeerManager implements PeerManagerLike {
       this.lastPongReceived.set(conn.peer, Date.now());
       this.onPeerStatusChange?.(conn.peer, 'CONNECTED');
       
-      // If we are a client connecting to host, let the host know our username & avatar
-      if (!this.isHost && this.isHostConnection(conn)) {
-        conn.send({ type: 'PLAYER_JOINED', payload: { username: this.username, avatar: this.avatar }, sender: this.myPeerId });
+      // Same reconnect path as standalone joinGame (hub owns the PeerJS connect).
+      if (!this.isHost && this.isHostConnection(conn) && this.myPeerId && this.hostPeerId) {
+        const prev = loadSession(this.hostPeerId);
+        if (prev?.previousPeerId && prev.previousPeerId !== this.myPeerId) {
+          conn.send({
+            type: "REQUEST_RECONNECT",
+            previousPeerId: prev.previousPeerId,
+            username: this.username,
+            sessionToken: prev.sessionToken,
+          });
+          this.sessionToken = createSessionToken();
+        } else if (prev?.sessionToken && prev.previousPeerId === this.myPeerId) {
+          this.sessionToken = prev.sessionToken;
+        }
+        this.persistHubSession();
+        conn.send({
+          type: "PLAYER_JOINED",
+          payload: { username: this.username, avatar: this.avatar },
+          sender: this.myPeerId,
+        });
       }
     });
 
@@ -383,14 +427,36 @@ export class HubPeerManager implements PeerManagerLike {
   // ---- Game PeerManager API (used by embedded games via externalPeerManager) ----
 
   public sendToHost(type: string, payload: Record<string, unknown>): void {
+    // In-game REGISTER_SESSION refreshes the token; hub already owns username/avatar.
+    if (type === "REGISTER_SESSION" && typeof payload.sessionToken === "string") {
+      this.sessionToken = payload.sessionToken;
+      this.persistHubSession();
+    }
+
     if (this.isHost) {
       if (this.hostActionHandler && this.myPeerId) {
         this.hostActionHandler(this.myPeerId, { type, ...payload });
       }
-    } else if (this.hostPeerId) {
-      const conn = this.connections.get(this.hostPeerId);
-      if (conn && conn.open) conn.send({ type, ...payload });
+      return;
     }
+    if (!this.hostPeerId) return;
+    const conn = this.connections.get(this.hostPeerId);
+    if (conn?.open) {
+      conn.send({ type, ...payload });
+      return;
+    }
+    // Match p2play-core retry — conn may still be opening after Peer "open".
+    const started = Date.now();
+    const room = this.hostPeerId;
+    const trySend = () => {
+      const c = this.connections.get(room);
+      if (c?.open) {
+        c.send({ type, ...payload });
+        return;
+      }
+      if (Date.now() - started < 5000) window.setTimeout(trySend, 100);
+    };
+    window.setTimeout(trySend, 50);
   }
 
   public broadcastState(state: any): void {
@@ -473,6 +539,7 @@ export class HubPeerManager implements PeerManagerLike {
     if (me) {
       me.avatar = newAvatar;
     }
+    this.persistHubSession();
     if (this.isHost) {
       this.broadcast({ type: 'SYNC_LOBBY', payload: this.lobbyPlayers });
     } else if (this.hostPeerId) {
@@ -524,6 +591,7 @@ export class HubPeerManager implements PeerManagerLike {
   }
 
   public disconnect() {
+    if (this.hostPeerId) clearSession(this.hostPeerId);
     this.stopHeartbeat();
     this.connections.forEach(conn => conn.close());
     this.connections.clear();
