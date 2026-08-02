@@ -119,7 +119,7 @@ export default defineConfig({
     // file:../p2play-core brings its own node_modules/react — force one copy
     dedupe: ["react", "react-dom"],
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 })
