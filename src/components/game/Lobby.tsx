@@ -3,7 +3,7 @@ import { AvatarSelector } from "./AvatarSelector";
 
 interface LobbyProps {
   status: 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED';
-  onCreate: (name: string, username: string, avatar: string, enableVoice: boolean) => void;
+  onCreate: (name: string, username: string, avatar: string, enableVoice: boolean, enableTextChat: boolean) => void;
   onJoin: (name: string, username: string, avatar: string) => void;
 }
 
@@ -24,7 +24,9 @@ export function Lobby({ status, onCreate, onJoin }: LobbyProps) {
       joinCodeLabel="Saisir le code du salon"
       joinCodePlaceholder="CODE DU SALON..."
       joinButtonText="Rejoindre un salon"
-      onCreateRoom={(code, username, avatar, enableVoice) => onCreate(code, username, avatar, enableVoice)}
+      onCreateRoom={(code, username, avatar, enableVoice, enableTextChat) =>
+        onCreate(code, username, avatar, enableVoice, enableTextChat)
+      }
       onJoinRoom={(code, username, avatar) => onJoin(code, username, avatar)}
       renderAvatarSelector={({ selectedAvatar, onSelectAvatar }) => (
         <AvatarSelector selectedAvatar={selectedAvatar} onSelectAvatar={onSelectAvatar} layout="grid" />

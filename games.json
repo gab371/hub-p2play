@@ -23,6 +23,10 @@
     "pirates": {
       "repo": "gab371/royal-pirates",
       "version": "v0.2.1"
+    },
+    "spy": {
+      "repo": "gab371/spy-words",
+      "version": "v0.1.0"
     }
   }
 }

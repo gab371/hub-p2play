@@ -52,6 +52,7 @@ export class HubPeerManager implements PeerManagerLike {
   public avatar: string = "👑";
   public lobbyPlayers: { peerId: string; username: string; avatar: string }[] = [];
   public enableVoice: boolean = true;
+  public enableTextChat: boolean = true;
   public chatHistory: ChatMessage[] = [];
   public onChatHistorySync: ((messages: ChatMessage[]) => void) | null = null;
   private sessionToken: string = createSessionToken();
@@ -71,11 +72,19 @@ export class HubPeerManager implements PeerManagerLike {
     });
   }
 
-  public initialize(isHost: boolean, roomId: string, username: string, avatar: string = "👑", enableVoice: boolean = true) {
+  public initialize(
+    isHost: boolean,
+    roomId: string,
+    username: string,
+    avatar: string = "👑",
+    enableVoice: boolean = true,
+    enableTextChat: boolean = true
+  ) {
     this.isHost = isHost;
     this.username = username;
     this.avatar = avatar;
     this.enableVoice = enableVoice;
+    this.enableTextChat = enableTextChat;
     this.chatHistory = [];
     this.sessionToken = createSessionToken();
     this.lobbyPlayers = [{ peerId: isHost ? roomId : "", username, avatar }];
@@ -370,6 +379,7 @@ export class HubPeerManager implements PeerManagerLike {
       gameConfig: this.gameConfig,
       phase: this.phase,
       enableVoice: this.enableVoice,
+      enableTextChat: this.enableTextChat,
       customGames: this.customGames,
     };
   }
@@ -382,6 +392,9 @@ export class HubPeerManager implements PeerManagerLike {
     this.phase = state.phase ?? 'HUB_LOBBY';
     if (state.enableVoice !== undefined) {
       this.enableVoice = state.enableVoice;
+    }
+    if (state.enableTextChat !== undefined) {
+      this.enableTextChat = state.enableTextChat;
     }
     if (Array.isArray(state.customGames)) {
       this.customGames = state.customGames;

@@ -19,6 +19,7 @@ const LOCAL_MANIFEST_SOURCES = {
   pool: path.join(__dirname, '..', 'billard-p2play', 'public', MANIFEST_FILENAME),
   uno: path.join(__dirname, '..', 'uno-p2play', 'public', MANIFEST_FILENAME),
   pirates: path.join(__dirname, '..', 'royal-pirates', 'public', MANIFEST_FILENAME),
+  spy: path.join(__dirname, '..', 'spy-words', 'public', MANIFEST_FILENAME),
 };
 
 if (!fs.existsSync(publicGamesDir)) {

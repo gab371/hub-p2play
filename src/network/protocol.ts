@@ -24,6 +24,7 @@ export interface HubState {
   gameConfig: any | null;
   phase: HubPhase;
   enableVoice?: boolean;
+  enableTextChat?: boolean;
   /** Host-owned live GitHub games mirrored to guests. */
   customGames?: CustomGameMeta[];
 }

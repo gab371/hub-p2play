@@ -27,6 +27,7 @@ interface GameMountPanelProps {
   lateJoin?: boolean;
   gameConfig?: any;
   hubPhase?: string;
+  enableTextChat?: boolean;
   /** From hub-manifest.json; defaults to mount{Key}. */
   mountFnName?: string;
   /** From hub-manifest.json `shellBackground`. */
@@ -49,6 +50,7 @@ export function GameMountPanel({
   lateJoin,
   gameConfig,
   hubPhase,
+  enableTextChat,
   mountFnName,
   shellBackground,
   onExit,
@@ -156,6 +158,7 @@ export function GameMountPanel({
             lateJoin,
             gameConfig,
             hubPhase,
+            enableTextChat,
             onExit,
           });
           if (typeof cleanup === "function") {

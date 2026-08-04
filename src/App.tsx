@@ -85,6 +85,7 @@ export default function App() {
           lateJoin={!hub.isHost}
           gameConfig={hub.gameConfig}
           hubPhase={hub.hubPhase}
+          enableTextChat={hub.enableTextChat}
           mountFnName={activeGameObj?.mountFn}
           shellBackground={activeGameObj?.shellBackground}
           onExit={hub.returnToHub}
@@ -123,6 +124,16 @@ export default function App() {
                     }
                   >
                     {hub.enableVoice ? "🎙️ Vocal Actif" : "🔇 Vocal Désactivé"}
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      hub.enableTextChat
+                        ? "h-auto border-violet-800 bg-violet-950/80 px-3 py-1.5 text-violet-300"
+                        : "h-auto border-zinc-800 bg-zinc-900 px-3 py-1.5 text-zinc-500"
+                    }
+                  >
+                    {hub.enableTextChat ? "💬 Chat Actif" : "🚫 Chat Désactivé"}
                   </Badge>
                   <Badge variant="outline" className="h-auto gap-1 py-1 pl-3 pr-1 font-mono text-zinc-400">
                     Code : <span className="font-bold text-violet-400">{hub.roomId}</span>
@@ -197,6 +208,8 @@ export default function App() {
                   title="Chat du Salon"
                   placeholder="Discuter avec le salon…"
                   emptyLabel="Aucun message. L'historique est conservé entre les jeux."
+                  disabled={!hub.enableTextChat}
+                  disabledNotice="Chat textuel désactivé par l'hôte."
                   className="bg-zinc-900/40 border border-zinc-850 rounded-3xl p-5 shadow-xl flex flex-col text-zinc-100 text-sm"
                   maxHeight="220px"
                   scrollbarAccent="violet"

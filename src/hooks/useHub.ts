@@ -18,6 +18,7 @@ export function useHub() {
   const [gameConfig, setGameConfig] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
   const [enableVoice, setEnableVoice] = useState(true);
+  const [enableTextChat, setEnableTextChat] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => globalHubPeer.chatHistory);
 
   const {
@@ -124,6 +125,7 @@ export function useHub() {
       setActiveGame(state.activeGame);
       setGameConfig(state.gameConfig);
       if (state.enableVoice !== undefined) setEnableVoice(state.enableVoice);
+      if (state.enableTextChat !== undefined) setEnableTextChat(state.enableTextChat);
       if (Array.isArray(state.customGames)) syncCustomGamesFromHub(state.customGames);
     };
 
@@ -154,11 +156,18 @@ export function useHub() {
   }, [status, roomId, syncCustomGamesFromHub]);
 
   const createRoom = useCallback(
-    (roomName: string, username: string, avatar: string = "👑", voiceEnabled: boolean = true) => {
+    (
+      roomName: string,
+      username: string,
+      avatar: string = "👑",
+      voiceEnabled: boolean = true,
+      textChatEnabled: boolean = true
+    ) => {
       setIsHost(true);
       setEnableVoice(voiceEnabled);
+      setEnableTextChat(textChatEnabled);
       seedHostCustomGames();
-      globalHubPeer.initialize(true, roomName, username, avatar, voiceEnabled);
+      globalHubPeer.initialize(true, roomName, username, avatar, voiceEnabled, textChatEnabled);
     },
     [seedHostCustomGames],
   );
@@ -191,6 +200,7 @@ export function useHub() {
     hubPhase: globalHubPeer.phase,
     isHost,
     enableVoice,
+    enableTextChat,
     chatMessages,
     sendChat,
     createRoom,
